@@ -1,4 +1,12 @@
-//! Vulkan Context
+//! Vulkan Graphix Context
+//!
+//! The vulkan VK_CTX will initialize:
+//! 1. Vulkan Instance
+//! 2. Vulkan Debug Messenger (If required)
+//! 3. A rendering surface
+//! 4. Pick a Physical Device
+//! 5. Create a Logical Device
+//! 6. Create the required Queues
 
 pub const VK_CTX = struct {
     const ENABLE_VALIDATION_LAYERS: bool = @import("builtin").mode == .Debug;

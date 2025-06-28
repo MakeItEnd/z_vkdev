@@ -15,7 +15,7 @@ pub const Engine = struct {
     window: sdl.video.Window,
 
     /// Vulkan context
-    vk_ctx: VK_CTX,
+    renderer: Renderer,
 
     pub fn init(allocator: std.mem.Allocator) !Engine {
         var self: Engine = .{
@@ -25,7 +25,7 @@ pub const Engine = struct {
             .window_extent = .{ .width = 1700, .height = 900 },
             .init_flags = .{ .video = true },
             .window = undefined,
-            .vk_ctx = undefined,
+            .renderer = undefined,
         };
 
         try sdl.init.init(self.init_flags);
@@ -38,8 +38,8 @@ pub const Engine = struct {
             window_flags,
         );
 
-        self.vk_ctx = try VK_CTX.init(self.allocator, self.window);
-        std.log.debug("[Engine][Vulkan Context] Initialized successfully!", .{});
+        self.renderer = try Renderer.init(self.allocator, self.window);
+        std.log.debug("[Engine][Renderer] Initialized successfully!", .{});
 
         std.log.debug("[Engine] Initialized successfully!", .{});
 
@@ -47,7 +47,8 @@ pub const Engine = struct {
     }
 
     pub fn deinit(self: *Engine) void {
-        self.vk_ctx.deinit();
+        self.renderer.deinit();
+        std.log.debug("[Engine][Renderer] Deinitialized successfully!", .{});
 
         self.window.deinit();
         sdl.init.quit(self.init_flags);
@@ -57,11 +58,6 @@ pub const Engine = struct {
     }
 
     pub fn run(self: *Engine) !void {
-        // const surface = try self.window.getSurface();
-
-        // try surface.fillRect(null, .{ .value = 123 });
-        // try self.window.updateSurface();
-
         game_loop: while (true) {
             while (sdl.events.poll()) |event| switch (event) {
                 .key_down => |key_down| if (key_down.key) |key| {
@@ -110,4 +106,4 @@ const std = @import("std");
 const sdl = @import("sdl3");
 const vk = @import("vulkan");
 
-const VK_CTX = @import("./vk_ctx.zig").VK_CTX;
+const Renderer = @import("./renderer/renderer.zig").Renderer;
