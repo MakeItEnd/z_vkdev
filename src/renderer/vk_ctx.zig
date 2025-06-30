@@ -61,6 +61,7 @@ pub const VK_CTX = struct {
         self.physical_device = try vkb.PhysicalDeviceSelector.new(
             self.allocator,
             &self.instance,
+            @enumFromInt(@intFromPtr(self.surface.surface)),
         ).pick();
         std.log.debug("[Engine][Vulkan][Physical Device] Selected!", .{});
 
@@ -68,6 +69,7 @@ pub const VK_CTX = struct {
             self.allocator,
             &self.instance,
             self.physical_device,
+            @enumFromInt(@intFromPtr(self.surface.surface)),
         ).build();
         errdefer self.device.destroyDevice(self.vk_allocator);
         std.log.debug("[Engine][Vulkan][Device] Initialized successfully!", .{});

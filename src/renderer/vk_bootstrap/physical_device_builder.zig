@@ -3,14 +3,17 @@
 pub const PhysicalDeviceSelector = struct {
     allocator: std.mem.Allocator,
     instance: *vk.InstanceProxy,
+    surface: vk.SurfaceKHR,
 
     pub fn new(
         allocator: std.mem.Allocator,
         instance: *vk.InstanceProxy,
+        surface: vk.SurfaceKHR,
     ) PhysicalDeviceSelector {
         return .{
             .allocator = allocator,
             .instance = instance,
+            .surface = surface,
         };
     }
 
@@ -33,7 +36,12 @@ pub const PhysicalDeviceSelector = struct {
         const Props = self.instance.getPhysicalDeviceProperties(physical_device);
         std.log.debug("Device Name: {s}", .{Props.device_name});
 
-        const indices: QueueFamilyIndices = try QueueFamilyIndices.find(self.allocator, self.instance, physical_device);
+        const indices: QueueFamilyIndices = try QueueFamilyIndices.find(
+            self.allocator,
+            self.instance,
+            physical_device,
+            self.surface,
+        );
 
         return self.checkFeatures(physical_device) and Props.device_type == .discrete_gpu and indices.isComplete();
     }
@@ -57,7 +65,12 @@ pub const PhysicalDeviceSelector = struct {
 
         self.instance.getPhysicalDeviceFeatures2(physical_device, &features2);
 
-        return features13.dynamic_rendering == vk.TRUE and features13.synchronization_2 == vk.TRUE and features12.buffer_device_address == vk.TRUE and features12.descriptor_indexing == vk.TRUE and features2.features.geometry_shader == vk.TRUE;
+        // ! KEEP THESE IN SYNC WITH THE LOGICAL DEVICE ONES.
+        return features13.dynamic_rendering == vk.TRUE and
+            features13.synchronization_2 == vk.TRUE and
+            features12.buffer_device_address == vk.TRUE and
+            features12.descriptor_indexing == vk.TRUE and
+            features2.features.geometry_shader == vk.TRUE;
     }
 };
 
@@ -65,4 +78,5 @@ const std = @import("std");
 const sdl3 = @import("sdl3");
 const vk = @import("vulkan");
 
-const QueueFamilyIndices = @import("queue_family_indices.zig").QueueFamilyIndices;
+const QueueFamilyIndices = @import("utils.zig").QueueFamilyIndices;
+const requiredFeatures = @import("utils.zig").requiredFeatures;

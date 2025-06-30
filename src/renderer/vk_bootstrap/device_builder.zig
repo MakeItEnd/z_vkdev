@@ -10,14 +10,14 @@ pub const DeviceBuilder = struct {
         allocator: std.mem.Allocator,
         instance: *vk.InstanceProxy,
         physical_device: vk.PhysicalDevice,
+        surface: vk.SurfaceKHR,
     ) DeviceBuilder {
         const queue_family_indices: QueueFamilyIndices = QueueFamilyIndices.find(
             allocator,
             instance,
             physical_device,
-        ) catch QueueFamilyIndices{
-            .graphics_family = null,
-        };
+            surface,
+        ) catch QueueFamilyIndices{};
 
         return .{
             .allocator = allocator,
@@ -43,6 +43,7 @@ pub const DeviceBuilder = struct {
             // },
         };
 
+        // ! KEEP THESE IN SYNC WITH THE PHYSICAL DEVICE ONES.
         var features14: vk.PhysicalDeviceVulkan14Features = .{};
         var features13: vk.PhysicalDeviceVulkan13Features = .{
             .dynamic_rendering = vk.TRUE,
@@ -88,4 +89,4 @@ const std = @import("std");
 const sdl3 = @import("sdl3");
 const vk = @import("vulkan");
 
-const QueueFamilyIndices = @import("./queue_family_indices.zig").QueueFamilyIndices;
+const QueueFamilyIndices = @import("./utils.zig").QueueFamilyIndices;

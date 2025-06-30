@@ -38,7 +38,7 @@ pub const Engine = struct {
             window_flags,
         );
 
-        self.renderer = try Renderer.init(self.allocator, self.window);
+        self.renderer = try Renderer.init(self.allocator, self.window, self.window_extent);
         std.log.debug("[Engine][Renderer] Initialized successfully!", .{});
 
         std.log.debug("[Engine] Initialized successfully!", .{});
