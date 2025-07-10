@@ -10,7 +10,7 @@ pub const Engine = struct {
     /// Size of the render window
     window_extent: vk.Extent2D,
     /// SDL init flags
-    init_flags: sdl.init.Flags,
+    init_flags: sdl.InitFlags,
     /// The application window
     window: sdl.video.Window,
 
@@ -28,7 +28,7 @@ pub const Engine = struct {
             .renderer = undefined,
         };
 
-        try sdl.init.init(self.init_flags);
+        try sdl.init(self.init_flags);
 
         const window_flags: sdl.video.WindowFlags = .{ .vulkan = true };
         self.window = try sdl.video.Window.init(
@@ -51,8 +51,8 @@ pub const Engine = struct {
         std.log.debug("[Engine][Renderer] Deinitialized successfully!", .{});
 
         self.window.deinit();
-        sdl.init.quit(self.init_flags);
-        sdl.init.shutdown();
+        sdl.quit(self.init_flags);
+        sdl.shutdown();
 
         std.log.debug("[Engine] Deinitialized successfully!", .{});
     }
