@@ -1,7 +1,8 @@
 //! Vulkan Context
 
 pub const Renderer = struct {
-    vk_ctx: VK_CTX,
+    allocator: std.mem.Allocator,
+    vk_ctx: *VK_CTX,
     swap_chain: SwapChain,
 
     pub fn init(
@@ -10,12 +11,14 @@ pub const Renderer = struct {
         extent: vk.Extent2D,
     ) !Renderer {
         var self: Renderer = undefined;
+        self.allocator = allocator;
 
-        self.vk_ctx = try VK_CTX.init(allocator, window);
+        self.vk_ctx = try allocator.create(VK_CTX);
+        self.vk_ctx.* = try VK_CTX.init(allocator, window);
         errdefer self.vk_ctx.deinit();
         std.log.debug("[Engine][Vulkan][Context] Initialized successfully!", .{});
 
-        self.swap_chain = try SwapChain.init(&self.vk_ctx, extent);
+        self.swap_chain = try SwapChain.init(self.vk_ctx, extent);
         errdefer self.swap_chain.deinit();
         std.log.debug("[Engine][Vulkan][Swap Chain] Initialized successfully!", .{});
 
@@ -23,10 +26,13 @@ pub const Renderer = struct {
     }
 
     pub fn deinit(self: Renderer) void {
+        self.vk_ctx.device.deviceWaitIdle() catch @panic("Fuck");
+
         self.swap_chain.deinit();
         std.log.debug("[Engine][Vulkan][Swap Chain] Deinitialized successfully!", .{});
 
         self.vk_ctx.deinit();
+        self.allocator.destroy(self.vk_ctx);
         std.log.debug("[Engine][Vulkan][Context] Deinitialized successfully!", .{});
     }
 };
