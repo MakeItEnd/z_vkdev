@@ -5,6 +5,7 @@ pub const SwapChain = struct {
 
     handle: vk.SwapchainKHR,
     extent: vk.Extent2D,
+    swap_images: []SwapImage,
     // image_format: vk.Format,
     // surface_format: vk.SurfaceFormatKHR,
     // present_mode: vk.PresentModeKHR,
@@ -82,17 +83,34 @@ pub const SwapChain = struct {
         //     vk_ctx.device.destroySwapchainKHR(old_handle, null);
         // }
 
+        self.swap_images = try initSwapchainImages(
+            vk_ctx,
+            self.handle,
+            surface_format.format,
+            self.vk_ctx.allocator,
+        );
+        errdefer {
+            for (self.swap_images) |si| si.deinit(vk_ctx);
+
+            self.vk_ctx.allocator.free(self.swap_images);
+        }
+        std.log.debug("[Engine][Vulkan][Swap Chain][Swap Images] Initialized successfully!", .{});
+
         return self;
     }
 
     pub fn deinitExceptHandle(self: SwapChain) void {
-        // for (self.swap_images) |si| si.deinit(self.gc);
-        // self.allocator.free(self.swap_images);
-        self.vk_ctx.device.destroySemaphore(self.next_image_acquired, null);
+        for (self.swap_images) |si| si.deinit(self.vk_ctx);
+        self.vk_ctx.allocator.free(self.swap_images);
+        std.log.debug("[Engine][Vulkan][Swap Chain][Swap Images] Deinitialized successfully!", .{});
+
+        // self.vk_ctx.device.destroySemaphore(self.next_image_acquired, null);
     }
 
     pub fn deinit(self: SwapChain) void {
         if (self.handle == .null_handle) return;
+
+        self.deinitExceptHandle();
 
         self.vk_ctx.device.destroySwapchainKHR(
             self.handle,
@@ -122,6 +140,32 @@ pub const SwapChain = struct {
                 ),
             };
         }
+    }
+
+    fn initSwapchainImages(
+        vk_ctx: *const VK_CTX,
+        swapchain: vk.SwapchainKHR,
+        format: vk.Format,
+        allocator: std.mem.Allocator,
+    ) ![]SwapImage {
+        const images = try vk_ctx.device.getSwapchainImagesAllocKHR(
+            swapchain,
+            allocator,
+        );
+        defer allocator.free(images);
+
+        const swap_images = try allocator.alloc(SwapImage, images.len);
+        errdefer allocator.free(swap_images);
+
+        var i: usize = 0;
+        errdefer for (swap_images[0..i]) |si| si.deinit(vk_ctx);
+
+        for (images) |image| {
+            swap_images[i] = try SwapImage.init(vk_ctx, image, format);
+            i += 1;
+        }
+
+        return swap_images;
     }
 };
 
