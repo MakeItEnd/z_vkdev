@@ -13,8 +13,8 @@ pub const Renderer = struct {
         var self: Renderer = undefined;
         self.allocator = allocator;
 
-        self.vk_ctx = try allocator.create(VK_CTX);
-        self.vk_ctx.* = try VK_CTX.init(allocator, window);
+        self.vk_ctx = try self.allocator.create(VK_CTX);
+        self.vk_ctx.* = try VK_CTX.init(self.allocator, window);
         errdefer self.vk_ctx.deinit();
         std.log.debug("[Engine][Vulkan][Context] Initialized successfully!", .{});
 
@@ -44,4 +44,4 @@ const vk = @import("vulkan");
 const VK_CTX = @import("./vk_ctx.zig").VK_CTX;
 const SwapChain = @import("./swap_chain.zig").SwapChain;
 
-// const vkb = @import("./vk_bootstrap.zig");
+const vk_init = @import("./vk_initializers.zig");
