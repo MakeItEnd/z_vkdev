@@ -49,8 +49,8 @@
         //     .hash = "N-V-__8AAKDR9QE0UDIcMBqpmUjBm5ayQHNNVb8JuOCy4GOo",
         // },
         .sdl3 = .{
-            .url = "git+https://github.com/Gota7/zig-sdl3?ref=master#85f87955d14764121a7deaa0590370228004b0e3",
-            .hash = "sdl3-0.0.1-NmT1QxmtHgClb-lMOw-Pstc7gRpMHC8cPXk8TYsBuPYe",
+            .url = "git+https://github.com/Gota7/zig-sdl3?ref=master#50c39d4ed8a09a2021bc9d893cfd3e76ff8f75db",
+            .hash = "sdl3-0.0.1-NmT1Q6jTHwChKq1z-b9fujswpZm0-zo4sZp_0AQN98YI",
         },
     },
     .paths = .{

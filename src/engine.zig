@@ -68,18 +68,13 @@ pub const Engine = struct {
                 .window_resized => {
                     std.log.info("[Window] Resized", .{});
                 },
-                .unknown => |un| switch (un.event_type) {
-                    sdl.c.SDL_EVENT_WINDOW_MINIMIZED, sdl.c.SDL_EVENT_WINDOW_FOCUS_LOST => {
-                        self.stop_rendering = true;
-                        std.log.debug("[Rendering] Stopped.", .{});
-                    },
-                    sdl.c.SDL_EVENT_WINDOW_RESTORED, sdl.c.SDL_EVENT_WINDOW_FOCUS_GAINED => {
-                        self.stop_rendering = false;
-                        std.log.debug("[Rendering] Resumed.", .{});
-                    },
-                    else => {
-                        // std.log.debug("Window unknown event type: {d}!", .{un.event_type});
-                    },
+                .window_minimized, .window_focus_lost => {
+                    self.stop_rendering = true;
+                    std.log.debug("[Rendering] Stopped.", .{});
+                },
+                .window_restored, .window_focus_gained => {
+                    self.stop_rendering = false;
+                    std.log.debug("[Rendering] Resumed.", .{});
                 },
                 else => {
                     // std.log.debug("else: {d}", .{e.type});

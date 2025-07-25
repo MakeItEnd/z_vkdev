@@ -1,6 +1,8 @@
 //! Vulkan Context
 
 pub const Renderer = struct {
+    const FRAME_OVERLAP: usize = 2;
+
     allocator: std.mem.Allocator,
     vk_ctx: *VK_CTX,
     swap_chain: SwapChain,
@@ -35,6 +37,11 @@ pub const Renderer = struct {
         self.allocator.destroy(self.vk_ctx);
         std.log.debug("[Engine][Vulkan][Context] Deinitialized successfully!", .{});
     }
+};
+
+const FrameData = struct {
+    commandPool: vk.CommandPool,
+    mainCommandBuffer: vk.CommandBuffer,
 };
 
 const std = @import("std");
