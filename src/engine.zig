@@ -88,12 +88,12 @@ pub const Engine = struct {
 
             try self.draw();
 
-            break :game_loop; // TODO: REMOVE once basic rendering works
+            // break :game_loop; // TODO: REMOVE once basic rendering works
         }
     }
 
     fn draw(self: *Engine) !void {
-        _ = self;
+        try self.renderer.draw();
     }
 };
 

@@ -24,7 +24,7 @@ pub const VK_CTX = struct {
     physical_device: vk.PhysicalDevice = .null_handle,
     device: vk.DeviceProxy,
 
-    // graphics_queue: vk.Queue,
+    graphics_queue: Queue,
 
     pub fn init(allocator: std.mem.Allocator, window: sdl.video.Window) !VK_CTX {
         var self: VK_CTX = undefined;
@@ -74,6 +74,18 @@ pub const VK_CTX = struct {
         errdefer self.device.destroyDevice(self.vk_allocator);
         std.log.debug("[Engine][Vulkan][Device] Initialized successfully!", .{});
 
+        const queue_family_indices: vkb.QueueFamilyIndices = try vkb.QueueFamilyIndices.find(
+            self.allocator,
+            &self.instance,
+            self.physical_device,
+            @enumFromInt(@intFromPtr(self.surface.surface)),
+        );
+        self.graphics_queue = Queue.init(
+            &self.device,
+            queue_family_indices.graphics_family.?,
+        );
+        std.log.debug("[Engine][Vulkan][Queue][Graphics] Initialized successfully!", .{});
+
         return self;
     }
 
@@ -95,6 +107,18 @@ pub const VK_CTX = struct {
         self.allocator.destroy(self.device.wrapper);
         self.allocator.destroy(self.instance.wrapper);
         std.log.debug("[Engine][Vulkan] Deinitialized successfully!", .{});
+    }
+};
+
+pub const Queue = struct {
+    handle: vk.Queue,
+    family: u32,
+
+    fn init(device: *vk.DeviceProxy, family: u32) Queue {
+        return .{
+            .handle = device.getDeviceQueue(family, 0),
+            .family = family,
+        };
     }
 };
 

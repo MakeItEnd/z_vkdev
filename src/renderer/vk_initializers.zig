@@ -25,7 +25,7 @@ pub fn command_buffer_begin_info(flags: ?vk.CommandBufferUsageFlags) vk.CommandB
 pub fn command_buffer_submit_info(cmd: vk.CommandBuffer) vk.CommandBufferSubmitInfo {
     return .{
         .command_buffe = cmd,
-        .device_mas = 0,
+        .device_mask = 0,
     };
 }
 
@@ -42,17 +42,17 @@ pub fn semaphore_create_info(flags: ?vk.SemaphoreCreateFlags) vk.SemaphoreCreate
 }
 
 pub fn submit_info(
-    cmd: *vk.CommandBufferSubmitInfo,
+    cmd: *const vk.CommandBufferSubmitInfo,
     signalSemaphoreInfo: ?*vk.SemaphoreSubmitInfo,
     waitSemaphoreInfo: ?*vk.SemaphoreSubmitInfo,
 ) vk.SubmitInfo2 {
     return .{
         .wait_semaphore_info_count = if (waitSemaphoreInfo) |_| 1 else 0,
-        .p_wait_semaphore_infos = waitSemaphoreInfo,
+        .p_wait_semaphore_infos = @ptrCast(waitSemaphoreInfo),
         .command_buffer_info_count = 1,
-        .p_command_buffer_infos = cmd,
+        .p_command_buffer_infos = @ptrCast(cmd),
         .signal_semaphore_info_count = if (signalSemaphoreInfo) |_| 1 else 0,
-        .p_signal_semaphore_infos = signalSemaphoreInfo,
+        .p_signal_semaphore_infos = @ptrCast(signalSemaphoreInfo),
     };
 }
 

@@ -1,22 +1,15 @@
 //! A Vulkan Swap Chain
 
 pub const SwapChain = struct {
-    vk_ctx: *VK_CTX,
+    vk_ctx: *VK_CTX, // ! TODO: Check if it should hold this or just pass it down when needen
 
     handle: vk.SwapchainKHR,
     extent: vk.Extent2D,
-    swap_images: []SwapImage,
-    // image_format: vk.Format,
-    // surface_format: vk.SurfaceFormatKHR,
-    // present_mode: vk.PresentModeKHR,
-
-    // images: []vk.Image,
-    // views: []vk.ImageView,
+    swap_images: []SwapChainImage,
 
     pub fn init(vk_ctx: *VK_CTX, extent: vk.Extent2D) !SwapChain {
         var self: SwapChain = undefined;
         self.vk_ctx = vk_ctx;
-        std.log.debug("vk_ctx.* = {*}", .{self.vk_ctx});
 
         const swap_chain_support: SwapChainSupportDetails = try SwapChainSupportDetails.init(
             vk_ctx.allocator,
@@ -47,7 +40,10 @@ pub const SwapChain = struct {
             .image_color_space = surface_format.color_space,
             .image_extent = self.extent,
             .image_array_layers = 1,
-            .image_usage = vk.ImageUsageFlags{ .color_attachment_bit = true },
+            .image_usage = vk.ImageUsageFlags{
+                .color_attachment_bit = true,
+                .transfer_dst_bit = true,
+            },
             .pre_transform = swap_chain_support.capabilities.current_transform,
             .composite_alpha = vk.CompositeAlphaFlagsKHR{ .opaque_bit_khr = true },
             .present_mode = present_mode,
@@ -118,6 +114,21 @@ pub const SwapChain = struct {
         );
     }
 
+    pub fn next_image_index(self: *const SwapChain, semaphore: vk.Semaphore, fence: vk.Fence) !u32 {
+        const ani_result = try self.vk_ctx.device.acquireNextImageKHR(
+            self.handle,
+            1_000_000_000,
+            semaphore,
+            fence,
+        );
+
+        if (ani_result.result != .success) {
+            return error.CouldNotRetrieveSwapChainNextImageIndex;
+        }
+
+        return ani_result.image_index;
+    }
+
     fn choose_extent(
         capabilities: vk.SurfaceCapabilitiesKHR,
         width: u32,
@@ -147,21 +158,21 @@ pub const SwapChain = struct {
         swapchain: vk.SwapchainKHR,
         format: vk.Format,
         allocator: std.mem.Allocator,
-    ) ![]SwapImage {
+    ) ![]SwapChainImage {
         const images = try vk_ctx.device.getSwapchainImagesAllocKHR(
             swapchain,
             allocator,
         );
         defer allocator.free(images);
 
-        const swap_images = try allocator.alloc(SwapImage, images.len);
+        const swap_images = try allocator.alloc(SwapChainImage, images.len);
         errdefer allocator.free(swap_images);
 
         var i: usize = 0;
         errdefer for (swap_images[0..i]) |si| si.deinit(vk_ctx);
 
         for (images) |image| {
-            swap_images[i] = try SwapImage.init(vk_ctx, image, format);
+            swap_images[i] = try SwapChainImage.init(vk_ctx, image, format);
             i += 1;
         }
 
@@ -234,66 +245,6 @@ const SwapChainSupportDetails = struct {
     }
 };
 
-const SwapImage = struct {
-    image: vk.Image,
-    view: vk.ImageView,
-    image_acquired: vk.Semaphore,
-    render_finished: vk.Semaphore,
-    frame_fence: vk.Fence,
-
-    fn init(vk_ctx: *const VK_CTX, image: vk.Image, format: vk.Format) !SwapImage {
-        const view = try vk_ctx.device.createImageView(&.{
-            .image = image,
-            .view_type = .@"2d",
-            .format = format,
-            .components = .{ .r = .identity, .g = .identity, .b = .identity, .a = .identity },
-            .subresource_range = .{
-                .aspect_mask = .{ .color_bit = true },
-                .base_mip_level = 0,
-                .level_count = 1,
-                .base_array_layer = 0,
-                .layer_count = 1,
-            },
-        }, null);
-        errdefer vk_ctx.device.destroyImageView(view, null);
-
-        const image_acquired = try vk_ctx.device.createSemaphore(&.{}, null);
-        errdefer vk_ctx.device.destroySemaphore(image_acquired, null);
-
-        const render_finished = try vk_ctx.device.createSemaphore(&.{}, null);
-        errdefer vk_ctx.device.destroySemaphore(render_finished, null);
-
-        const frame_fence = try vk_ctx.device.createFence(&.{ .flags = .{ .signaled_bit = true } }, null);
-        errdefer vk_ctx.device.destroyFence(frame_fence, null);
-
-        return SwapImage{
-            .image = image,
-            .view = view,
-            .image_acquired = image_acquired,
-            .render_finished = render_finished,
-            .frame_fence = frame_fence,
-        };
-    }
-
-    fn deinit(self: SwapImage, vk_ctx: *const VK_CTX) void {
-        self.waitForFence(vk_ctx) catch return;
-
-        vk_ctx.device.destroyImageView(self.view, null);
-        vk_ctx.device.destroySemaphore(self.image_acquired, null);
-        vk_ctx.device.destroySemaphore(self.render_finished, null);
-        vk_ctx.device.destroyFence(self.frame_fence, null);
-    }
-
-    fn waitForFence(self: SwapImage, vk_ctx: *const VK_CTX) !void {
-        _ = try vk_ctx.device.waitForFences(
-            1,
-            @ptrCast(&self.frame_fence),
-            vk.TRUE,
-            std.math.maxInt(u64),
-        );
-    }
-};
-
 const std = @import("std");
 const sdl = @import("sdl3");
 const vk = @import("vulkan");
@@ -301,3 +252,4 @@ const vk = @import("vulkan");
 const vkb = @import("./vk_bootstrap.zig");
 const VK_CTX = @import("./vk_ctx.zig").VK_CTX;
 const QueueFamilyIndices = vkb.QueueFamilyIndices;
+const SwapChainImage = @import("./swap_chain_image.zig").SwapChainImage;
