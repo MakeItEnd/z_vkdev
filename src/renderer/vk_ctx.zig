@@ -86,6 +86,28 @@ pub const VK_CTX = struct {
         );
         std.log.debug("[Engine][Vulkan][Queue][Graphics] Initialized successfully!", .{});
 
+        const vma = @import("./vma.zig");
+
+        const vulkan_f = vma.VulkanFunctions{
+            .vkGetInstanceProcAddr = self.vkbw.dispatch.vkGetInstanceProcAddr.?,
+            .vkGetDeviceProcAddr = self.instance.wrapper.dispatch.vkGetDeviceProcAddr.?,
+        };
+        const info = vma.AllocatorCreateInfo{
+            .physical_device = self.physical_device,
+            .device = self.device.handle,
+            .p_vulkan_functions = @ptrCast(&vulkan_f),
+            .instance = self.instance.handle,
+            .vulkan_api_version = @bitCast(vk.API_VERSION_1_4),
+        };
+
+        var vma_allocator: vma.Allocator = undefined;
+        if (vma.vmaCreateAllocator(&info, &vma_allocator) != .success) {
+            return error.VulkanMemoryAllocatorFaildToInitialize;
+        }
+        std.log.debug("[Engine][Vulkan][Vulkan Memory Allocator] Initialized successfully!", .{});
+
+        vma.vmaDestroyAllocator(vma_allocator);
+
         return self;
     }
 

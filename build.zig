@@ -3,7 +3,7 @@ const std = @import("std");
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -88,6 +88,37 @@ pub fn build(b: *std.Build) void {
         .registry = b.path("./vk.xml"),
     }).module("vulkan-zig");
     lib.root_module.addImport("vulkan", vulkan);
+
+    // Vulkan Memory Allocator ------------------------------------------------
+    // ------------------------------------------------------------------------
+    const vma = b.dependency("vma", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    lib.linkLibCpp();
+    // Generate implementation
+    // try vma.path("vk_mem_alloc.cpp").getPath3(b, null).toString(b.allocator);
+    const impl = try std.fs.createFileAbsolute(
+        try vma.path("vk_mem_alloc.cpp").getPath3(
+            b,
+            &lib.step,
+        ).toString(b.allocator),
+        .{},
+    );
+    try impl.writeAll(
+        \\#define VMA_IMPLEMENTATION
+        \\#define VMA_STATIC_VULKAN_FUNCTIONS 0
+        \\#include <vk_mem_alloc.h>
+    );
+    impl.close();
+
+    lib.addIncludePath(vma.path("include"));
+
+    lib.addCSourceFile(.{
+        .file = vma.path("vk_mem_alloc.cpp"),
+        .flags = &.{"-std=c++17"},
+    });
 
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
