@@ -57,41 +57,30 @@ pub const SwapChainImage = struct {
         current_layout: vk.ImageLayout,
         new_layout: vk.ImageLayout,
     ) void {
-        const aspect_mask: vk.ImageAspectFlags = if (new_layout == vk.ImageLayout.depth_attachment_optimal)
-            .{ .depth_bit = true }
-        else
-            .{ .color_bit = true };
-
-        const image_barrier: vk.ImageMemoryBarrier2 = .{
-            .src_stage_mask = .{
-                .all_commands_bit = true,
-            },
-            .src_access_mask = .{
-                .memory_write_bit = true,
-            },
-            .dst_stage_mask = .{
-                .all_commands_bit = true,
-            },
-            .dst_access_mask = .{
-                .host_write_bit = true,
-                .memory_read_bit = true,
-            },
-            .old_layout = current_layout,
-            .new_layout = new_layout,
-            .image = self.handle,
-            .subresource_range = vk_init.image_subresource_range(aspect_mask),
-            .src_queue_family_index = 0,
-            .dst_queue_family_index = 0,
-        };
-
-        const dependency_info: vk.DependencyInfo = .{
-            .image_memory_barrier_count = 1,
-            .p_image_memory_barriers = @ptrCast(&image_barrier),
-        };
-
-        vk_ctx.device.cmdPipelineBarrier2(
+        img_utils.transition(
+            self.handle,
+            vk_ctx,
             cmd,
-            &dependency_info,
+            current_layout,
+            new_layout,
+        );
+    }
+
+    pub fn copy_into(
+        self: *SwapChainImage,
+        vk_ctx: *VK_CTX,
+        cmd: vk.CommandBuffer,
+        source: vk.Image,
+        source_size: vk.Extent2D,
+        destination_size: vk.Extent2D,
+    ) void {
+        img_utils.copy(
+            vk_ctx,
+            cmd,
+            source,
+            source_size,
+            self.handle,
+            destination_size,
         );
     }
 
@@ -109,3 +98,4 @@ const std = @import("std");
 const vk = @import("vulkan");
 const VK_CTX = @import("./vk_ctx.zig").VK_CTX;
 const vk_init = @import("./vk_initializers.zig");
+const img_utils = @import("image_utils.zig");

@@ -86,7 +86,7 @@ pub const VK_CTX = struct {
         );
         std.log.debug("[Engine][Vulkan][Queue][Graphics] Initialized successfully!", .{});
 
-        const vulkan_f = zig_vma.c.VulkanFunctions{
+        const vulkan_f = zig_vma.VulkanFunctions{
             .vkGetInstanceProcAddr = self.vkbw.dispatch.vkGetInstanceProcAddr.?,
             .vkGetDeviceProcAddr = self.instance.wrapper.dispatch.vkGetDeviceProcAddr.?,
         };

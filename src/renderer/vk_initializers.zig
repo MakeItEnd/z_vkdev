@@ -229,7 +229,11 @@ pub fn image_create_info(
         .extent = extent,
         .mip_levels = 1,
         .array_layers = 1,
-        .samples = .@"1_bit",
+        // For MSAA. we will not be using it by default, so default it to 1 sample per pixel.
+        .samples = .{
+            .@"1_bit" = true,
+        },
+        // Optimal tiling, which means the image is stored on the best gpu format.
         .tiling = .optimal,
         .usage = usageFlags,
         .sharing_mode = .exclusive,
@@ -245,11 +249,16 @@ pub fn imageview_create_info(
     aspectFlags: vk.ImageAspectFlags,
 ) vk.ImageViewCreateInfo {
     return .{
-        .flags = aspectFlags,
+        .flags = .{},
         .image = image,
         .view_type = .@"2d",
         .format = format,
-        .components = .{},
+        .components = .{
+            .r = .identity,
+            .g = .identity,
+            .b = .identity,
+            .a = .identity,
+        },
         .subresource_range = .{
             .aspect_mask = aspectFlags,
             .base_mip_level = 0,

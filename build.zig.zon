@@ -49,8 +49,8 @@
             .hash = "N-V-__8AACmyPgDcDRNlHsADkbrTlSTwlW-azw5ObWSs_Qlu",
         },
         .zig_vma = .{
-            .url = "git+https://github.com/MakeItEnd/zig_vma?ref=main#e42ba316002eab241b1a5162f0f8c640539107fb",
-            .hash = "zig_vma-0.0.0-Na0RTdiIAQAP9_eMFAL8Q0CLi4ghuA8H38vawOiZMJdF",
+            .url = "git+https://github.com/MakeItEnd/zig_vma?ref=main#5d1711f1851a00fa7a3f6902abbe5af248d3ea22",
+            .hash = "zig_vma-0.0.0-Na0RTR-NAQDb8fgdhV7u8sIDlB-dRa0Wrw_OIDriGMZX",
         },
         .vulkan_headers = .{
             .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.4.323.tar.gz",

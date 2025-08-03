@@ -7,6 +7,10 @@ pub const Renderer = struct {
     vk_ctx: *VK_CTX,
     swap_chain: SwapChain,
 
+    extent: vk.Extent2D,
+
+    draw_image: AllocatedImage,
+
     frames: [FRAME_OVERLAP]FrameData,
     frame_number: usize = 0,
 
@@ -18,6 +22,8 @@ pub const Renderer = struct {
         var self: Renderer = undefined;
         self.allocator = allocator;
 
+        self.extent = extent;
+
         self.vk_ctx = try self.allocator.create(VK_CTX);
         self.vk_ctx.* = try VK_CTX.init(self.allocator, window);
         errdefer self.vk_ctx.deinit();
@@ -26,6 +32,10 @@ pub const Renderer = struct {
         self.swap_chain = try SwapChain.init(self.vk_ctx, extent);
         errdefer self.swap_chain.deinit();
         std.log.debug("[Engine][Vulkan][Swap Chain] Initialized successfully!", .{});
+
+        self.draw_image = try AllocatedImage.init(self.vk_ctx, extent);
+        errdefer self.draw_image.deinit(self.vk_ctx);
+        std.log.debug("[Engine][Vulkan][Draw Image] Initialized successfully!", .{});
 
         self.frames = .{
             try FrameData.init(self.vk_ctx),
@@ -42,6 +52,9 @@ pub const Renderer = struct {
         for (self.frames) |frame| {
             frame.deinit(self.vk_ctx);
         }
+
+        self.draw_image.deinit(self.vk_ctx);
+        std.log.debug("[Engine][Vulkan][Draw Image] Deinitialized successfully!", .{});
 
         self.swap_chain.deinit();
         std.log.debug("[Engine][Vulkan][Swap Chain] Deinitialized successfully!", .{});
@@ -99,46 +112,44 @@ pub const Renderer = struct {
             &cmd_begin_info,
         );
 
-        // Make the swapchain image into writeable mode before rendering.
-        image.transition(
+        // Transition our main draw image into general layout so we can write into it
+        // we will overwrite it all so we dont care about what was the older layout
+        self.draw_image.transition(
             self.vk_ctx,
             cmd,
             .undefined,
             .general,
         );
 
-        // Make a clear-color from frame number.
-        // This will flash with a 120 frame period.
-        const flash: f32 = @abs(@sin(
-            @as(f32, @floatFromInt(self.frame_number)) / 120.0,
-        ));
-        const clear_value: vk.ClearColorValue = .{
-            .float_32 = .{
-                0.0,
-                0.0,
-                flash,
-                1.0,
-            },
-        };
+        self.draw_background(cmd);
 
-        const clear_range: vk.ImageSubresourceRange = vk_init.image_subresource_range(
-            .{ .color_bit = true },
+        // Transition the draw image and the swapchain image into their correct transfer layouts.
+        self.draw_image.transition(
+            self.vk_ctx,
+            cmd,
+            .general,
+            .transfer_src_optimal,
+        );
+        image.transition(
+            self.vk_ctx,
+            cmd,
+            .undefined,
+            .transfer_dst_optimal,
         );
 
-        // Clear image.
-        device.cmdClearColorImage(
+        // Execute a copy from the draw image into the swap chain.
+        image.copy_into(
+            self.vk_ctx,
             cmd,
-            image.handle,
-            .general,
-            &clear_value,
-            1,
-            @ptrCast(&clear_range),
+            self.draw_image.handle,
+            self.extent,
+            self.swap_chain.extent,
         );
 
         image.transition(
             self.vk_ctx,
             cmd,
-            .general,
+            .transfer_dst_optimal,
             .present_src_khr,
         );
 
@@ -211,6 +222,36 @@ pub const Renderer = struct {
         self.frame_number += 1;
     }
 
+    fn draw_background(self: *Renderer, cmd: vk.CommandBuffer) void {
+        // Make a clear-color from frame number.
+        // This will flash with a 120 frame period.
+        const flash: f32 = @abs(@sin(
+            @as(f32, @floatFromInt(self.frame_number)) / 120.0,
+        ));
+        const clear_value: vk.ClearColorValue = .{
+            .float_32 = .{
+                0.0,
+                0.0,
+                flash,
+                1.0,
+            },
+        };
+
+        const clear_range: vk.ImageSubresourceRange = vk_init.image_subresource_range(
+            .{ .color_bit = true },
+        );
+
+        // Clear image.
+        self.vk_ctx.device.cmdClearColorImage(
+            cmd,
+            self.draw_image.handle,
+            .general,
+            &clear_value,
+            1,
+            @ptrCast(&clear_range),
+        );
+    }
+
     fn get_current_frame(self: *Renderer) *FrameData {
         return &self.frames[self.frame_number % FRAME_OVERLAP];
     }
@@ -223,5 +264,6 @@ const vk = @import("vulkan");
 const VK_CTX = @import("./vk_ctx.zig").VK_CTX;
 const SwapChain = @import("./swap_chain.zig").SwapChain;
 const FrameData = @import("./frame_data.zig").FrameData;
+const AllocatedImage = @import("./allocated_image.zig").AllocatedImage;
 
 const vk_init = @import("./vk_initializers.zig");
