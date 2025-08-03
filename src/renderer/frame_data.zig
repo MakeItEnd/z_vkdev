@@ -19,20 +19,20 @@ pub const FrameData = struct {
     pub fn deinit(self: FrameData, vk_ctx: *VK_CTX) void {
         vk_ctx.device.destroyCommandPool(
             self.commandPool,
-            vk_ctx.vk_allocator,
+            null,
         );
 
         vk_ctx.device.destroyFence(
             self.render_fence,
-            vk_ctx.vk_allocator,
+            null,
         );
         // vk_ctx.device.destroySemaphore(
         //     self.render_semaphore,
-        //     vk_ctx.vk_allocator,
+        //     null,
         // );
         vk_ctx.device.destroySemaphore(
             self.swapchain_semaphore,
-            vk_ctx.vk_allocator,
+            null,
         );
     }
 
@@ -51,16 +51,16 @@ pub const FrameData = struct {
 
         self.render_fence = try vk_ctx.device.createFence(
             &fence_create_info,
-            vk_ctx.vk_allocator,
+            null,
         );
 
         self.swapchain_semaphore = try vk_ctx.device.createSemaphore(
             &semaphore_create_info,
-            vk_ctx.vk_allocator,
+            null,
         );
         // self.render_semaphore = try vk_ctx.device.createSemaphore(
         //     &semaphore_create_info,
-        //     vk_ctx.vk_allocator,
+        //     null,
         // );
     }
 
@@ -77,7 +77,7 @@ pub const FrameData = struct {
 
         self.commandPool = try vk_ctx.device.createCommandPool(
             &command_poool_info,
-            vk_ctx.vk_allocator,
+            null,
         );
 
         // Allocate the default command buffer that we will use for rendering.

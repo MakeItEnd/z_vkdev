@@ -69,10 +69,10 @@ pub const SwapChain = struct {
             create_info.p_queue_family_indices = null;
         }
 
-        self.handle = vk_ctx.device.createSwapchainKHR(&create_info, vk_ctx.vk_allocator) catch {
+        self.handle = vk_ctx.device.createSwapchainKHR(&create_info, null) catch {
             return error.SwapchainCreationFailed;
         };
-        errdefer vk_ctx.device.destroySwapchainKHR(self.handle, vk_ctx.vk_allocator);
+        errdefer vk_ctx.device.destroySwapchainKHR(self.handle, null);
 
         // if (old_handle != .null_handle) {
         //     // Apparently, the old swapchain handle still needs to be destroyed after recreating.
@@ -110,7 +110,7 @@ pub const SwapChain = struct {
 
         self.vk_ctx.device.destroySwapchainKHR(
             self.handle,
-            self.vk_ctx.vk_allocator,
+            null,
         );
     }
 

@@ -7,12 +7,13 @@
 //! 4. Pick a Physical Device
 //! 5. Create a Logical Device
 //! 6. Create the required Queues
+//! 6. Create VMA instance
 
 pub const VK_CTX = struct {
     const ENABLE_VALIDATION_LAYERS: bool = @import("builtin").mode == .Debug;
 
     allocator: std.mem.Allocator,
-    vk_allocator: ?*const vk.AllocationCallbacks,
+    vma: zig_vma.VulkanMemoryAllocator,
 
     vkbw: vk.BaseWrapper,
 
@@ -30,7 +31,6 @@ pub const VK_CTX = struct {
         var self: VK_CTX = undefined;
 
         self.allocator = allocator;
-        self.vk_allocator = null;
 
         self.vkbw = vk.BaseWrapper.load(@as(
             vk.PfnGetInstanceProcAddr,
@@ -46,7 +46,7 @@ pub const VK_CTX = struct {
             ).build();
 
         self.instance = vkb_instance.instance_proxy;
-        errdefer self.instance.destroyInstance(self.vk_allocator);
+        errdefer self.instance.destroyInstance(null);
         self.debug_messenger = vkb_instance.debug_messenger;
         std.log.debug("[Engine][Vulkan][Instance] Initialized successfully!", .{});
 
@@ -54,7 +54,7 @@ pub const VK_CTX = struct {
             window,
             // ! I'm 99% sure the below cast isn't correct
             @ptrFromInt(@intFromEnum(self.instance.handle)),
-            @ptrCast(self.vk_allocator),
+            null,
         );
         std.log.debug("[Engine][Vulkan][Surface] Initialized successfully!", .{});
 
@@ -71,7 +71,7 @@ pub const VK_CTX = struct {
             self.physical_device,
             @enumFromInt(@intFromPtr(self.surface.surface)),
         ).build();
-        errdefer self.device.destroyDevice(self.vk_allocator);
+        errdefer self.device.destroyDevice(null);
         std.log.debug("[Engine][Vulkan][Device] Initialized successfully!", .{});
 
         const queue_family_indices: vkb.QueueFamilyIndices = try vkb.QueueFamilyIndices.find(
@@ -86,43 +86,40 @@ pub const VK_CTX = struct {
         );
         std.log.debug("[Engine][Vulkan][Queue][Graphics] Initialized successfully!", .{});
 
-        const vma = @import("./vma.zig");
-
-        const vulkan_f = vma.VulkanFunctions{
+        const vulkan_f = zig_vma.c.VulkanFunctions{
             .vkGetInstanceProcAddr = self.vkbw.dispatch.vkGetInstanceProcAddr.?,
             .vkGetDeviceProcAddr = self.instance.wrapper.dispatch.vkGetDeviceProcAddr.?,
         };
-        const info = vma.AllocatorCreateInfo{
+        self.vma = try zig_vma.VulkanMemoryAllocator.init(&.{
             .physical_device = self.physical_device,
             .device = self.device.handle,
             .p_vulkan_functions = @ptrCast(&vulkan_f),
             .instance = self.instance.handle,
             .vulkan_api_version = @bitCast(vk.API_VERSION_1_4),
-        };
-
-        var vma_allocator: vma.Allocator = undefined;
-        if (vma.vmaCreateAllocator(&info, &vma_allocator) != .success) {
-            return error.VulkanMemoryAllocatorFaildToInitialize;
-        }
+            .flags = .{
+                .buffer_device_address_bit = true,
+            },
+        });
         std.log.debug("[Engine][Vulkan][Vulkan Memory Allocator] Initialized successfully!", .{});
-
-        vma.vmaDestroyAllocator(vma_allocator);
 
         return self;
     }
 
     pub fn deinit(self: VK_CTX) void {
+        self.vma.deinit();
+        std.log.debug("[Engine][Vulkan][Vulkan Memory Allocator] Destroyed successfully!", .{});
+
         self.surface.deinit();
         std.log.debug("[Engine][Vulkan][Surface] Destroyed successfully!", .{});
 
-        self.device.destroyDevice(self.vk_allocator);
+        self.device.destroyDevice(null);
         std.log.debug("[Engine][Vulkan][Device] Destroyed successfully!", .{});
 
         if (ENABLE_VALIDATION_LAYERS) {
-            self.instance.destroyDebugUtilsMessengerEXT(self.debug_messenger, self.vk_allocator);
+            self.instance.destroyDebugUtilsMessengerEXT(self.debug_messenger, null);
         }
 
-        self.instance.destroyInstance(self.vk_allocator);
+        self.instance.destroyInstance(null);
         std.log.debug("[Engine][Vulkan][Instace] Destroyed successfully!", .{});
 
         // Don't forget to free the tables to prevent a memory leak.
@@ -147,5 +144,6 @@ pub const Queue = struct {
 const std = @import("std");
 const sdl = @import("sdl3");
 const vk = @import("vulkan");
+const zig_vma = @import("zig_vma");
 
 const vkb = @import("./vk_bootstrap.zig");

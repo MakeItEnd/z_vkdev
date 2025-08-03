@@ -30,7 +30,7 @@ pub const Engine = struct {
 
         try sdl.init(self.init_flags);
 
-        const window_flags: sdl.video.WindowFlags = .{ .vulkan = true };
+        const window_flags: sdl.video.Window.Flags = .{ .vulkan = true };
         self.window = try sdl.video.Window.init(
             "Zig Vulkan Tutorial",
             @intCast(self.window_extent.width),
