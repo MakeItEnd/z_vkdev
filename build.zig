@@ -1,5 +1,6 @@
 const std = @import("std");
 
+// TODO: Add shader compilation to script `glslc --target-env=vulkan1.4 -o gradient.comp.spv gradient.comp `
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
 
