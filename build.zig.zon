@@ -44,10 +44,6 @@
             .url = "git+https://github.com/Gota7/zig-sdl3?ref=v0.1.0#2d11d7a368871c64e7b95ef8f3d3a37a83dd2738",
             .hash = "sdl3-0.0.1-NmT1Q_naIABvvZqajxpOI6ZhIMyAuRjf6CBO5Rpj356w",
         },
-        .vma = .{
-            .url = "git+https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator?ref=master#1076b348abd17859a116f4b111c43d58a588a086",
-            .hash = "N-V-__8AACmyPgDcDRNlHsADkbrTlSTwlW-azw5ObWSs_Qlu",
-        },
         .zig_vma = .{
             .url = "git+https://github.com/MakeItEnd/zig_vma?ref=main#5d1711f1851a00fa7a3f6902abbe5af248d3ea22",
             .hash = "zig_vma-0.0.0-Na0RTR-NAQDb8fgdhV7u8sIDlB-dRa0Wrw_OIDriGMZX",
