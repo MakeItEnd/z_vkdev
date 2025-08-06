@@ -269,10 +269,6 @@ pub fn imageview_create_info(
     };
 }
 
-// pub fn pipeline_layout_create_info() vk.PipelineLayoutCreateInfo {
-//     return .{};
-// }
-
 pub fn pipeline_shader_stage_create_info(
     stage: vk.ShaderStageFlagBits,
     shaderModule: vk.ShaderModule,

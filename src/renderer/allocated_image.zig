@@ -1,7 +1,7 @@
 pub const AllocatedImage = struct {
     handle: vk.Image,
     view: vk.ImageView,
-    allocation: zig_vma.c.Allocation,
+    allocation: zig_vma.Allocation,
     extent: vk.Extent3D,
     format: vk.Format,
 
@@ -17,13 +17,6 @@ pub const AllocatedImage = struct {
             .depth = 1,
         };
 
-        // const usages: vk.ImageUsageFlags = .{
-        //     .transfer_src_bit = true,
-        //     .transfer_dst_bit = true,
-        //     .storage_bit = true,
-        //     .color_attachment_bit = true,
-        // };
-
         const create_info = vk_init.image_create_info(
             self.format,
             .{
@@ -34,13 +27,6 @@ pub const AllocatedImage = struct {
             },
             self.extent,
         );
-
-        // const alloc_info: zig_vma.c.AllocationCreateInfo = .{
-        //     .usage = .gpu_only,
-        //     .required_flags = .{
-        //         .device_local_bit = true,
-        //     },
-        // };
 
         // For the draw image, we want to allocate it from gpu local memory.
         self.handle = try vk_ctx.vma.imageCreate(

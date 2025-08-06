@@ -87,8 +87,6 @@ pub const Engine = struct {
             }
 
             try self.draw();
-
-            // break :game_loop; // TODO: REMOVE once basic rendering works
         }
     }
 

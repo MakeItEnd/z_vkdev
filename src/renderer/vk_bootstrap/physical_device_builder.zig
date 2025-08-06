@@ -25,7 +25,7 @@ pub const PhysicalDeviceSelector = struct {
 
         for (physical_devices) |physical_device| {
             if (try self.isDeviceSuitable(physical_device)) {
-                return physical_device; // TODO: Check if the deallocation doesn't fuck this up
+                return physical_device;
             }
         }
 
