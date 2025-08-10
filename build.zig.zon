@@ -52,6 +52,10 @@
             .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.4.323.tar.gz",
             .hash = "N-V-__8AAKDR9QE0UDIcMBqpmUjBm5ayQHNNVb8JuOCy4GOo",
         },
+        .cimgui_zig = .{
+            .url = "git+https://github.com/tiawl/cimgui.zig#7cb7be931c8a35b85a2d298f856c59632843e518",
+            .hash = "cimgui_zig-1.0.0-2XubkrhrVQDAOjd7pjiUs2ggemHQ2fJWS25i49gGQtaM",
+        },
     },
     .paths = .{
         "build.zig",

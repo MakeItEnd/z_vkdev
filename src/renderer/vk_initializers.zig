@@ -78,7 +78,18 @@ pub fn attachment_info(
         .image_layout = layout orelse .color_attachment_optimal,
         .load_op = if (clear) |_| .clear else .load,
         .store_op = .store,
-        .clear = clear orelse .null_handle,
+        .resolve_mode = .{},
+        .resolve_image_layout = .undefined,
+        .clear_value = if (clear) |c| c.* else .{
+            .color = .{
+                .float_32 = [4]f32{
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                },
+            },
+        },
     };
 }
 
@@ -105,7 +116,7 @@ pub fn depth_attachment_info(
 pub fn rendering_info(
     renderExtent: vk.Extent2D,
     colorAttachment: *vk.RenderingAttachmentInfo,
-    depthAttachment: *vk.RenderingAttachmentInfo,
+    depthAttachment: ?*vk.RenderingAttachmentInfo,
 ) vk.RenderingInfo {
     return .{
         .flags = .{},
@@ -119,7 +130,7 @@ pub fn rendering_info(
         .layer_count = 1,
         .view_mask = 0,
         .color_attachment_count = 1,
-        .p_color_attachments = colorAttachment,
+        .p_color_attachments = @ptrCast(colorAttachment),
         .p_depth_attachment = depthAttachment,
         .p_stencil_attachment = null,
     };

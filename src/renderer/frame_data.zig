@@ -4,7 +4,7 @@ pub const FrameData = struct {
     commandPool: vk.CommandPool,
     mainCommandBuffer: vk.CommandBuffer,
     swapchain_semaphore: vk.Semaphore,
-    // render_semaphore: vk.Semaphore, // ! TODO: Might not be needed anymre as we use a per image one.
+    // render_semaphore: vk.Semaphore, // ! TODO: Might not be needed anymore as we use a per image one.
     render_fence: vk.Fence,
 
     pub fn init(vk_ctx: *VK_CTX) !FrameData {
@@ -96,4 +96,5 @@ pub const FrameData = struct {
 
 const std = @import("std");
 const vk = @import("vulkan");
+
 const VK_CTX = @import("./vk_ctx.zig").VK_CTX;

@@ -59,32 +59,38 @@ pub const Engine = struct {
 
     pub fn run(self: *Engine) !void {
         game_loop: while (true) {
-            while (sdl.events.poll()) |event| switch (event) {
-                .key_down => |key_down| if (key_down.key) |key| {
-                    if (key == .escape) break :game_loop;
-                },
-                .quit => break :game_loop,
-                .terminating => break :game_loop,
-                .window_resized => {
-                    std.log.info("[Window] Resized", .{});
-                },
-                .window_minimized, .window_focus_lost => {
-                    self.stop_rendering = true;
-                    std.log.debug("[Rendering] Stopped.", .{});
-                },
-                .window_restored, .window_focus_gained => {
-                    self.stop_rendering = false;
-                    std.log.debug("[Rendering] Resumed.", .{});
-                },
-                else => {
-                    // std.log.debug("else: {d}", .{e.type});
-                },
-            };
+            while (sdl.events.poll()) |event| {
+                switch (event) {
+                    .key_down => |key_down| if (key_down.key) |key| {
+                        if (key == .escape) break :game_loop;
+                    },
+                    .quit => break :game_loop,
+                    .terminating => break :game_loop,
+                    .window_resized => {
+                        std.log.info("[Window] Resized", .{});
+                    },
+                    .window_minimized, .window_focus_lost => {
+                        self.stop_rendering = true;
+                        std.log.debug("[Rendering] Stopped.", .{});
+                    },
+                    .window_restored, .window_focus_gained => {
+                        self.stop_rendering = false;
+                        std.log.debug("[Rendering] Resumed.", .{});
+                    },
+                    else => {
+                        // std.log.debug("else: {d}", .{e.type});
+                    },
+                }
+
+                self.renderer.imgui_ctx.process_event(event);
+            }
 
             if (self.stop_rendering) {
                 std.time.sleep(std.time.ns_per_ms * 100);
                 continue;
             }
+
+            self.renderer.imgui_ctx.draw();
 
             try self.draw();
         }

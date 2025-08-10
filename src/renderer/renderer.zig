@@ -21,6 +21,9 @@ pub const Renderer = struct {
     gradient_pipeline: vk.Pipeline,
     gradient_pipeline_layout: vk.PipelineLayout,
 
+    im_ctx: IM_CTX,
+    imgui_ctx: Imgui_CTX,
+
     pub fn init(
         allocator: std.mem.Allocator,
         window: sdl.video.Window,
@@ -50,6 +53,18 @@ pub const Renderer = struct {
         try self.init_pipelines();
         std.log.debug("[Engine][Vulkan][Pipelines] Initialized successfully!", .{});
 
+        self.im_ctx = try IM_CTX.init(self.vk_ctx);
+        errdefer self.im_ctx.deinit(self.vk_ctx);
+        std.log.debug("[Engine][Vulkan][Immediate Mode Context] Initialized successfully!", .{});
+
+        self.imgui_ctx = try Imgui_CTX.init(
+            self.vk_ctx,
+            window,
+            self.swap_chain.image_format,
+        );
+        errdefer self.imgui_ctx.deinit(self.vk_ctx);
+        std.log.debug("[Engine][Vulkan][Imgui] Initialized successfully!", .{});
+
         self.frames = .{
             try FrameData.init(self.vk_ctx),
             try FrameData.init(self.vk_ctx),
@@ -65,6 +80,11 @@ pub const Renderer = struct {
         for (self.frames) |frame| {
             frame.deinit(self.vk_ctx);
         }
+
+        self.imgui_ctx.deinit(self.vk_ctx);
+        std.log.debug("[Engine][Vulkan][Imgui] Deinitialized successfully!", .{});
+        self.im_ctx.deinit(self.vk_ctx);
+        std.log.debug("[Engine][Vulkan][Immediate Mode Context] Deinitialized successfully!", .{});
 
         self.vk_ctx.device.destroyPipelineLayout(
             self.gradient_pipeline_layout,
@@ -178,6 +198,20 @@ pub const Renderer = struct {
             self.vk_ctx,
             cmd,
             .transfer_dst_optimal,
+            .color_attachment_optimal,
+        );
+
+        self.imgui_ctx.vulkan_draw(
+            self.vk_ctx,
+            cmd,
+            image.view,
+            self.extent,
+        );
+
+        image.transition(
+            self.vk_ctx,
+            cmd,
+            .color_attachment_optimal,
             .present_src_khr,
         );
 
@@ -429,6 +463,9 @@ pub const Renderer = struct {
             null,
         );
     }
+
+    // fn immediate_submit(self: *Renderer, function: *const fn (cmd: vk.CommandBuffer) void) void {}
+    // fn init_imgui(self: *Renderer) void {}
 };
 
 const std = @import("std");
@@ -442,5 +479,7 @@ const DescriptorLayoutBuilder = @import("./descriptors.zig").DescriptorLayoutBui
 const FrameData = @import("./frame_data.zig").FrameData;
 const SwapChain = @import("./swap_chain.zig").SwapChain;
 const VK_CTX = @import("./vk_ctx.zig").VK_CTX;
+const IM_CTX = @import("./vk_ctx_im.zig").IM_CTX;
+const Imgui_CTX = @import("./imgui_ctx.zig").Imgui_CTX;
 const vk_init = @import("./vk_initializers.zig");
 const shaders = @import("./shaders.zig");

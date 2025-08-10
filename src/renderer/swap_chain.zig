@@ -7,6 +7,9 @@ pub const SwapChain = struct {
     extent: vk.Extent2D,
     swap_images: []SwapChainImage,
 
+    /// * Need by Imgui
+    image_format: vk.Format,
+
     pub fn init(vk_ctx: *VK_CTX, extent: vk.Extent2D) !SwapChain {
         var self: SwapChain = undefined;
         self.vk_ctx = vk_ctx;
@@ -32,6 +35,8 @@ pub const SwapChain = struct {
         if (swap_chain_support.capabilities.max_image_count > 0 and image_count > swap_chain_support.capabilities.max_image_count) {
             image_count = swap_chain_support.capabilities.max_image_count;
         }
+
+        self.image_format = surface_format.format;
 
         var create_info: vk.SwapchainCreateInfoKHR = .{
             .surface = @enumFromInt(@intFromPtr(vk_ctx.surface.surface)),

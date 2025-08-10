@@ -59,6 +59,21 @@ pub fn build(b: *std.Build) !void {
 
     lib.root_module.addImport("zig_vma", zig_vma);
 
+    // CIMGUI -----------------------------------------------------------------
+    // ------------------------------------------------------------------------
+    const cimgui = @import("cimgui_zig");
+
+    const cimgui_dep = b.dependency("cimgui_zig", .{
+        .target = target,
+        .optimize = optimize,
+        .platform = cimgui.Platform.SDL3,
+        .renderer = cimgui.Renderer.Vulkan,
+    });
+
+    // Where `exe` represents your executable/library to link to
+    lib.linkLibrary(cimgui_dep.artifact("cimgui"));
+    // lib.linkLibC();
+
     b.installArtifact(lib);
 
     const exe = b.addExecutable(.{
