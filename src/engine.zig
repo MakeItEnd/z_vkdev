@@ -62,6 +62,10 @@ pub const Engine = struct {
             while (sdl.events.poll()) |event| switch (event) {
                 .key_down => |key_down| if (key_down.key) |key| {
                     if (key == .escape) break :game_loop;
+
+                    if (key == .one) self.renderer.compute_effects_index = 0;
+                    if (key == .two) self.renderer.compute_effects_index = 1;
+                    if (key == .three) self.renderer.compute_effects_index = 2;
                 },
                 .quit => break :game_loop,
                 .terminating => break :game_loop,
@@ -82,7 +86,7 @@ pub const Engine = struct {
             };
 
             if (self.stop_rendering) {
-                std.time.sleep(std.time.ns_per_ms * 100);
+                std.Thread.sleep(std.time.ns_per_ms * 100);
                 continue;
             }
 

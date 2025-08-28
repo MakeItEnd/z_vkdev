@@ -1,7 +1,7 @@
 //! Shader helper
 
 pub fn load_module(
-    vk_ctx: *VK_CTX,
+    vk_ctx: *const VK_CTX,
     file_path: []const u8,
 ) !vk.ShaderModule {
     const file = try std.fs.cwd().openFile(file_path, .{});

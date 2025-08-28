@@ -1,14 +1,16 @@
 pub const DescriptorLayoutBuilder = struct {
-    bindings: std.ArrayList(vk.DescriptorSetLayoutBinding),
+    allocator: std.mem.Allocator,
+    bindings: std.array_list.Aligned(vk.DescriptorSetLayoutBinding, null),
 
     pub fn init(allocator: std.mem.Allocator) DescriptorLayoutBuilder {
         return .{
-            .bindings = std.ArrayList(vk.DescriptorSetLayoutBinding).init(allocator),
+            .allocator = allocator,
+            .bindings = .{},
         };
     }
 
     pub fn deinit(self: *DescriptorLayoutBuilder) void {
-        self.bindings.deinit();
+        self.bindings.deinit(self.allocator);
     }
 
     pub fn add_binding(
@@ -16,13 +18,16 @@ pub const DescriptorLayoutBuilder = struct {
         binding: u32,
         binding_type: vk.DescriptorType,
     ) !void {
-        try self.bindings.append(.{
-            .binding = binding,
-            .descriptor_type = binding_type,
-            .descriptor_count = 1,
-            .stage_flags = .{},
-            .p_immutable_samplers = null,
-        });
+        try self.bindings.append(
+            self.allocator,
+            .{
+                .binding = binding,
+                .descriptor_type = binding_type,
+                .descriptor_count = 1,
+                .stage_flags = .{},
+                .p_immutable_samplers = null,
+            },
+        );
     }
 
     pub fn clear(self: *DescriptorLayoutBuilder) void {
@@ -64,11 +69,11 @@ pub const DescriptorAllocator = struct {
         max_sets: u32,
         pool_rations: []const PoolSizeRatio,
     ) !DescriptorAllocator {
-        var pool_sizes: std.ArrayList(vk.DescriptorPoolSize) = std.ArrayList(vk.DescriptorPoolSize).init(vk_ctx.allocator);
-        defer pool_sizes.deinit();
+        var pool_sizes = std.array_list.Aligned(vk.DescriptorPoolSize, null){};
+        defer pool_sizes.deinit(vk_ctx.allocator);
 
         for (pool_rations) |ratio| {
-            try pool_sizes.append(.{
+            try pool_sizes.append(vk_ctx.allocator, .{
                 .type = ratio.descriptor_type,
                 .descriptor_count = @intFromFloat(ratio.ratio * @as(f32, @floatFromInt(max_sets))),
             });

@@ -42,20 +42,20 @@ pub const InstanceBuilder = struct {
     } {
         // Check extensions -------------------------------------------------------
         // ------------------------------------------------------------------------
-        var extension_names = std.ArrayList([*:0]const u8).init(self.allocator);
-        defer extension_names.deinit();
+        var extension_names = std.array_list.Aligned([*:0]const u8, null){};
+        defer extension_names.deinit(self.allocator);
         // these extensions are to support vulkan in mac os
         // see https://github.com/glfw/glfw/issues/2335
-        try extension_names.append(vk.extensions.khr_portability_enumeration.name);
-        try extension_names.append(vk.extensions.khr_get_physical_device_properties_2.name);
+        try extension_names.append(self.allocator, vk.extensions.khr_portability_enumeration.name);
+        try extension_names.append(self.allocator, vk.extensions.khr_get_physical_device_properties_2.name);
 
         if (self.enable_validation_layers) {
-            try extension_names.append(vk.extensions.ext_debug_utils.name);
+            try extension_names.append(self.allocator, vk.extensions.ext_debug_utils.name);
         }
 
         const sdl_extensions = try sdl3.vulkan.getInstanceExtensions();
         // try extension_names.appendSlice(@ptrCast(sdl_extensions[0..sdl_extensions.len]));
-        try extension_names.appendSlice(@ptrCast(sdl_extensions[0..sdl_extensions.len]));
+        try extension_names.appendSlice(self.allocator, @ptrCast(sdl_extensions[0..sdl_extensions.len]));
         for (extension_names.items) |extension| {
             std.log.debug("Instance Enabled Extension: {s}", .{extension});
         }

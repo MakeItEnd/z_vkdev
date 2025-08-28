@@ -18,8 +18,8 @@ pub const Renderer = struct {
     draw_image_descriptors: vk.DescriptorSet,
     draw_image_descriptor_layout: vk.DescriptorSetLayout,
 
-    gradient_pipeline: vk.Pipeline,
-    gradient_pipeline_layout: vk.PipelineLayout,
+    compute_effects: std.array_list.Aligned(ComputeEffect, null),
+    compute_effects_index: usize,
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -47,6 +47,8 @@ pub const Renderer = struct {
         try self.init_descriptors();
         std.log.debug("[Engine][Vulkan][Descriptors] Initialized successfully!", .{});
 
+        self.compute_effects = .{};
+        self.compute_effects_index = 0;
         try self.init_pipelines();
         std.log.debug("[Engine][Vulkan][Pipelines] Initialized successfully!", .{});
 
@@ -59,21 +61,17 @@ pub const Renderer = struct {
         return self;
     }
 
-    pub fn deinit(self: Renderer) void {
+    pub fn deinit(self: *Renderer) void {
         self.vk_ctx.device.deviceWaitIdle() catch @panic("Fuck");
 
         for (self.frames) |frame| {
             frame.deinit(self.vk_ctx);
         }
 
-        self.vk_ctx.device.destroyPipelineLayout(
-            self.gradient_pipeline_layout,
-            null,
-        );
-        self.vk_ctx.device.destroyPipeline(
-            self.gradient_pipeline,
-            null,
-        );
+        for (self.compute_effects.items) |compute_effect| {
+            compute_effect.deinit(self.vk_ctx);
+        }
+        self.compute_effects.deinit(self.allocator);
 
         self.global_descriptor_allocator.deinit(self.vk_ctx);
         self.vk_ctx.device.destroyDescriptorSetLayout(
@@ -252,7 +250,9 @@ pub const Renderer = struct {
 
     fn draw_background(self: *Renderer, cmd: vk.CommandBuffer) void {
         // self.draw_background_flashing(cmd);
-        self.draw_background_gradient(cmd);
+        // self.draw_background_gradient(cmd);
+        // self.draw_background_gradient_with_push_constants(cmd);
+        self.draw_compute_effect(cmd);
     }
 
     fn draw_background_flashing(self: *Renderer, cmd: vk.CommandBuffer) void {
@@ -303,6 +303,94 @@ pub const Renderer = struct {
             @ptrCast(&self.draw_image_descriptors),
             0,
             null,
+        );
+
+        // Execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it.
+        self.vk_ctx.device.cmdDispatch(
+            cmd,
+            @intFromFloat(@ceil(@as(f32, @floatFromInt(self.extent.width)) / 16.0)),
+            @intFromFloat(@ceil(@as(f32, @floatFromInt(self.extent.height)) / 16.0)),
+            1,
+        );
+        // vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16.0), std::ceil(_drawExtent.height / 16.0), 1);
+    }
+
+    fn draw_background_gradient_with_push_constants(self: *Renderer, cmd: vk.CommandBuffer) void {
+        // Bind the gradient drawing compute pipeline.
+        self.vk_ctx.device.cmdBindPipeline(
+            cmd,
+            .compute,
+            self.gradient_pipeline,
+        );
+
+        // Bind the descriptor set containing the draw image for the compute pipeline.
+        self.vk_ctx.device.cmdBindDescriptorSets(
+            cmd,
+            .compute,
+            self.gradient_pipeline_layout,
+            0,
+            1,
+            @ptrCast(&self.draw_image_descriptors),
+            0,
+            null,
+        );
+
+        const pc: ComputePushConstants = .{
+            .data1 = .{ 1, 0, 0, 1 },
+            .data2 = .{ 0, 0, 1, 1 },
+            .data3 = .{ 0, 0, 0, 0 },
+            .data4 = .{ 0, 0, 0, 0 },
+        };
+        self.vk_ctx.device.cmdPushConstants(
+            cmd,
+            self.gradient_pipeline_layout,
+            .{
+                .compute_bit = true,
+            },
+            0,
+            @sizeOf(ComputePushConstants),
+            @ptrCast(&pc),
+        );
+
+        // Execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it.
+        self.vk_ctx.device.cmdDispatch(
+            cmd,
+            @intFromFloat(@ceil(@as(f32, @floatFromInt(self.extent.width)) / 16.0)),
+            @intFromFloat(@ceil(@as(f32, @floatFromInt(self.extent.height)) / 16.0)),
+            1,
+        );
+        // vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16.0), std::ceil(_drawExtent.height / 16.0), 1);
+    }
+
+    fn draw_compute_effect(self: *Renderer, cmd: vk.CommandBuffer) void {
+        // Bind the gradient drawing compute pipeline.
+        self.vk_ctx.device.cmdBindPipeline(
+            cmd,
+            .compute,
+            self.compute_effects.items[self.compute_effects_index].pipeline,
+        );
+
+        // Bind the descriptor set containing the draw image for the compute pipeline.
+        self.vk_ctx.device.cmdBindDescriptorSets(
+            cmd,
+            .compute,
+            self.compute_effects.items[self.compute_effects_index].layout,
+            0,
+            1,
+            @ptrCast(&self.draw_image_descriptors),
+            0,
+            null,
+        );
+
+        self.vk_ctx.device.cmdPushConstants(
+            cmd,
+            self.compute_effects.items[self.compute_effects_index].layout,
+            .{
+                .compute_bit = true,
+            },
+            0,
+            @sizeOf(ComputePushConstants),
+            @ptrCast(&self.compute_effects.items[self.compute_effects_index].data),
         );
 
         // Execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it.
@@ -381,53 +469,39 @@ pub const Renderer = struct {
     }
 
     fn init_pipelines(self: *Renderer) !void {
-        try self.init_background_pipeline();
-    }
-
-    fn init_background_pipeline(self: *Renderer) !void {
-        const compute_layout: vk.PipelineLayoutCreateInfo = .{
-            .set_layout_count = 1,
-            .p_set_layouts = @ptrCast(&self.draw_image_descriptor_layout),
-        };
-
-        self.gradient_pipeline_layout = try self.vk_ctx.device.createPipelineLayout(
-            &compute_layout,
-            null,
-        );
-
-        const compute_draw_shader: vk.ShaderModule = try shaders.load_module(
+        try self.compute_effects.append(self.allocator, try ComputeEffect.create(
             self.vk_ctx,
             "./shaders/gradient.comp.spv",
-        );
+            "gradient",
+            .zero,
+            &self.draw_image_descriptor_layout,
+        ));
 
-        const stage_info: vk.PipelineShaderStageCreateInfo = .{
-            .stage = .{
-                .compute_bit = true,
+        try self.compute_effects.append(self.allocator, try ComputeEffect.create(
+            self.vk_ctx,
+            "./shaders/gradient_color.comp.spv",
+            "gradient_color",
+            .{
+                .data1 = .{ 1, 0, 0, 1 },
+                .data2 = .{ 0, 0, 1, 1 },
+                .data3 = .{ 0, 0, 0, 0 },
+                .data4 = .{ 0, 0, 0, 0 },
             },
-            .module = compute_draw_shader,
-            .p_name = "main",
-        };
+            &self.draw_image_descriptor_layout,
+        ));
 
-        const compute_pipeline_create_info: vk.ComputePipelineCreateInfo = .{
-            .layout = self.gradient_pipeline_layout,
-            .stage = stage_info,
-            .base_pipeline_index = 0,
-        };
-
-        if (try self.vk_ctx.device.createComputePipelines(
-            .null_handle,
-            1,
-            @ptrCast(&compute_pipeline_create_info),
-            null,
-            @ptrCast(&self.gradient_pipeline),
-        ) != .success) {
-            return error.FailedToCreateComputePipeline;
-        }
-
-        self.vk_ctx.device.destroyShaderModule(
-            compute_draw_shader,
-            null,
-        );
+        try self.compute_effects.append(self.allocator, try ComputeEffect.create(
+            self.vk_ctx,
+            "./shaders/sky.comp.spv",
+            "sky",
+            .{
+                .data1 = .{ 0.1, 0.2, 0.4, 1.97 },
+                .data2 = .{ 0, 0, 0, 0 },
+                .data3 = .{ 0, 0, 0, 0 },
+                .data4 = .{ 0, 0, 0, 0 },
+            },
+            &self.draw_image_descriptor_layout,
+        ));
     }
 };
 
@@ -444,3 +518,5 @@ const SwapChain = @import("./swap_chain.zig").SwapChain;
 const VK_CTX = @import("./vk_ctx.zig").VK_CTX;
 const vk_init = @import("./vk_initializers.zig");
 const shaders = @import("./shaders.zig");
+const ComputePushConstants = @import("./push_constants.zig").ComputePushConstants;
+const ComputeEffect = @import("./compute_effect.zig").ComputeEffect;

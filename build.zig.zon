@@ -37,16 +37,16 @@
     // internet connectivity.
     .dependencies = .{
         .vulkan = .{
-            .url = "git+https://github.com/Snektron/vulkan-zig?ref=zig-0.14-compat#2846d415d8c9f96c1675944d0762745422fe7aa0",
-            .hash = "vulkan-0.0.0-r7Ytx25WAwBqA-Qx5n7Hj1yZFEo_IwctejwitvrfL1k5",
+            .url = "git+https://github.com/Snektron/vulkan-zig?ref=master#8322c9593fc2115156ec8743ba4f3b4547e5eb24",
+            .hash = "vulkan-0.0.0-r7Ytx6o-AwBxVL-ZhD8ng7s23CaiQYV4GxOVzkmGdltw",
         },
         .sdl3 = .{
-            .url = "git+https://github.com/Gota7/zig-sdl3?ref=v0.1.0#2d11d7a368871c64e7b95ef8f3d3a37a83dd2738",
-            .hash = "sdl3-0.0.1-NmT1Q_naIABvvZqajxpOI6ZhIMyAuRjf6CBO5Rpj356w",
+            .url = "git+https://github.com/Gota7/zig-sdl3?ref=master#694ffacd7c2c0b83aaa7a9bb1e279d7b39ea9aee",
+            .hash = "sdl3-0.1.1-NmT1QwTgIADixpCS2g5pBBON5AEfnjOox94dU0dtT-tq",
         },
         .zig_vma = .{
-            .url = "git+https://github.com/MakeItEnd/zig_vma?ref=main#5d1711f1851a00fa7a3f6902abbe5af248d3ea22",
-            .hash = "zig_vma-0.0.0-Na0RTR-NAQDb8fgdhV7u8sIDlB-dRa0Wrw_OIDriGMZX",
+            .url = "git+https://github.com/MakeItEnd/zig_vma?ref=main#4a4c542bba0a69970feba6dd2647e054dd9b7480",
+            .hash = "zig_vma-0.0.0-Na0RTTaNAQBHDG4695mzlm7pfO4N8xRyd1pLQWYK7b1D",
         },
         .vulkan_headers = .{
             .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.4.323.tar.gz",
