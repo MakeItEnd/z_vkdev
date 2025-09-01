@@ -97,5 +97,4 @@ pub const SwapChainImage = struct {
 const std = @import("std");
 const vk = @import("vulkan");
 const VK_CTX = @import("./vk_ctx.zig").VK_CTX;
-const vk_init = @import("./vk_initializers.zig");
 const img_utils = @import("image_utils.zig");
