@@ -19,7 +19,7 @@ pub const QueueFamilyIndices = struct {
         defer allocator.free(props);
 
         for (props, 0..) |prop, index| {
-            std.log.debug("Prop {d} :: {any}", .{ index, prop.queue_flags });
+            // std.log.debug("Prop {d} :: {any}", .{ index, prop.queue_flags });
             if (prop.queue_flags.graphics_bit == true) {
                 self.graphics_family = @intCast(index);
             }

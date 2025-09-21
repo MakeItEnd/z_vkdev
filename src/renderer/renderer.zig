@@ -21,6 +21,9 @@ pub const Renderer = struct {
     compute_effects: std.array_list.Aligned(ComputeEffect, null),
     compute_effects_index: usize,
 
+    triangle_pipeline_layout: vk.PipelineLayout,
+    triangle_pipeline: vk.Pipeline,
+
     pub fn init(
         allocator: std.mem.Allocator,
         window: sdl.video.Window,
@@ -67,6 +70,9 @@ pub const Renderer = struct {
         for (self.frames) |frame| {
             frame.deinit(self.vk_ctx);
         }
+
+        self.vk_ctx.device.destroyPipelineLayout(self.triangle_pipeline_layout, null);
+        self.vk_ctx.device.destroyPipeline(self.triangle_pipeline, null);
 
         for (self.compute_effects.items) |compute_effect| {
             compute_effect.deinit(self.vk_ctx);
@@ -149,11 +155,20 @@ pub const Renderer = struct {
 
         self.draw_background(cmd);
 
-        // Transition the draw image and the swapchain image into their correct transfer layouts.
         self.draw_image.transition(
             self.vk_ctx,
             cmd,
             .general,
+            .color_attachment_optimal,
+        );
+
+        self.draw_geometry(cmd);
+
+        // Transition the draw image and the swapchain image into their correct transfer layouts.
+        self.draw_image.transition(
+            self.vk_ctx,
+            cmd,
+            .color_attachment_optimal,
             .transfer_src_optimal,
         );
         image.transition(
@@ -502,6 +517,133 @@ pub const Renderer = struct {
             },
             &self.draw_image_descriptor_layout,
         ));
+
+        try self.init_triangle_pipeline();
+    }
+
+    fn init_triangle_pipeline(self: *Renderer) !void {
+        const triangle_fragment_shader: vk.ShaderModule = try shaders.load_module(
+            self.vk_ctx,
+            "./shaders/colored_triangle.frag.spv",
+        );
+        std.log.debug("[Renderer][Pipeline]<Triangle> Fragment shader succesfully loaded.", .{});
+
+        const triangle_vertex_shader: vk.ShaderModule = try shaders.load_module(
+            self.vk_ctx,
+            "./shaders/colored_triangle.vert.spv",
+        );
+        std.log.debug("[Renderer][Pipeline]<Triangle> Vertex shader succesfully loaded.", .{});
+
+        // Build the pipeline layout that controls the inputs/outputs of the shader.
+        // We are not using descriptor sets or other systems yet,
+        // so no need to use anything other thantriangle_fragment_shader empty default.
+        const pipeline_layout_info: vk.PipelineLayoutCreateInfo = .{};
+        self.triangle_pipeline_layout = try self.vk_ctx.device.createPipelineLayout(
+            &pipeline_layout_info,
+            null,
+        );
+
+        var pipeline_builder: vkb.PieplineBuilder = try vkb.PieplineBuilder.init(self.vk_ctx);
+        defer pipeline_builder.deinit();
+
+        // Use the triangle layout we created.
+        pipeline_builder.pipeline_layout = self.triangle_pipeline_layout;
+        // Connecting the vertex and pixel shaders to the pipeline.
+        pipeline_builder.set_shaders(triangle_vertex_shader, triangle_fragment_shader);
+        // It will draw triangles.
+        pipeline_builder.set_input_topology(.triangle_list);
+        // Filled triangles.
+        pipeline_builder.set_polygon_mode(.fill);
+        // No backface culling.
+        pipeline_builder.set_cull_mode(.{}, .clockwise);
+        // No multisampling.draw_geometry()
+        pipeline_builder.set_multisampling_none();
+        // No blending.
+        pipeline_builder.disable_blending();
+        // No depth testing.
+        pipeline_builder.disable_depthtest();
+
+        // Connect the image format we will draw into, from draw image.
+        pipeline_builder.set_color_attachment_format(self.draw_image.format);
+        pipeline_builder.set_depth_format(.undefined);
+
+        // Finally build the pipeline.
+        self.triangle_pipeline = pipeline_builder.build();
+
+        // Clean structures.
+        self.vk_ctx.device.destroyShaderModule(triangle_fragment_shader, null);
+        self.vk_ctx.device.destroyShaderModule(triangle_vertex_shader, null);
+    }
+
+    fn draw_geometry(self: *Renderer, cmd: vk.CommandBuffer) void {
+        // Begin a render pass connected to our draw image.
+        var color_attachment: vk.RenderingAttachmentInfo = vk_init.attachment_info(
+            self.draw_image.view,
+            null,
+            .color_attachment_optimal,
+        );
+
+        const render_info: vk.RenderingInfo = vk_init.rendering_info(
+            self.extent,
+            &color_attachment,
+            null,
+        );
+        self.vk_ctx.device.cmdBeginRendering(
+            cmd,
+            @ptrCast(&render_info),
+        );
+
+        self.vk_ctx.device.cmdBindPipeline(
+            cmd,
+            .graphics,
+            self.triangle_pipeline,
+        );
+
+        // Set dynamic viewport and scissor.
+        const viewport: vk.Viewport = .{
+            .x = 0,
+            .y = 0,
+            .width = @floatFromInt(self.extent.width),
+            .height = @floatFromInt(self.extent.height),
+            .min_depth = 0.0,
+            .max_depth = 1.0,
+        };
+
+        self.vk_ctx.device.cmdSetViewport(
+            cmd,
+            0,
+            1,
+            @ptrCast(&viewport),
+        );
+
+        const scissor: vk.Rect2D = .{
+            .offset = .{
+                .x = 0,
+                .y = 0,
+            },
+            .extent = .{
+                .width = self.extent.width,
+                .height = self.extent.height,
+            },
+        };
+
+        self.vk_ctx.device.cmdSetScissor(
+            cmd,
+            0,
+            1,
+            @ptrCast(&scissor),
+        );
+
+        // Launch a draw command to draw 3 vertices.
+        self.vk_ctx.device.cmdDraw(
+            cmd,
+            3,
+            1,
+            0,
+            0,
+        );
+
+        self.vk_ctx.device.cmdEndRendering(cmd);
     }
 };
 
@@ -517,6 +659,7 @@ const FrameData = @import("./frame_data.zig").FrameData;
 const SwapChain = @import("./swap_chain.zig").SwapChain;
 const VK_CTX = @import("./vk_ctx.zig").VK_CTX;
 const vk_init = @import("./vk_initializers.zig");
+const vkb = @import("./vk_bootstrap.zig");
 const shaders = @import("./shaders.zig");
 const ComputePushConstants = @import("./push_constants.zig").ComputePushConstants;
 const ComputeEffect = @import("./compute_effect.zig").ComputeEffect;

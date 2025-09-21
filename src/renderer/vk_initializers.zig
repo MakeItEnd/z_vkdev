@@ -78,7 +78,15 @@ pub fn attachment_info(
         .image_layout = layout orelse .color_attachment_optimal,
         .load_op = if (clear) |_| .clear else .load,
         .store_op = .store,
-        .clear = clear orelse .null_handle,
+        .clear_value = if (clear) |c| c.* else .{
+            .color = .{ .int_32 = .{ 0, 0, 0, 0 } },
+            // .depth_stencil = .{
+            //     .depth = 0.0,
+            //     .stencil = 0,
+            // },
+        },
+        .resolve_mode = .{},
+        .resolve_image_layout = .undefined,
     };
 }
 
@@ -105,7 +113,7 @@ pub fn depth_attachment_info(
 pub fn rendering_info(
     renderExtent: vk.Extent2D,
     colorAttachment: *vk.RenderingAttachmentInfo,
-    depthAttachment: *vk.RenderingAttachmentInfo,
+    depthAttachment: ?*vk.RenderingAttachmentInfo,
 ) vk.RenderingInfo {
     return .{
         .flags = .{},
@@ -119,8 +127,8 @@ pub fn rendering_info(
         .layer_count = 1,
         .view_mask = 0,
         .color_attachment_count = 1,
-        .p_color_attachments = colorAttachment,
-        .p_depth_attachment = depthAttachment,
+        .p_color_attachments = @ptrCast(colorAttachment),
+        .p_depth_attachment = @ptrCast(depthAttachment),
         .p_stencil_attachment = null,
     };
 }
@@ -270,7 +278,7 @@ pub fn imageview_create_info(
 }
 
 pub fn pipeline_shader_stage_create_info(
-    stage: vk.ShaderStageFlagBits,
+    stage: vk.ShaderStageFlags,
     shaderModule: vk.ShaderModule,
     entry: ?[*:0]const u8,
 ) vk.PipelineShaderStageCreateInfo {
@@ -278,7 +286,7 @@ pub fn pipeline_shader_stage_create_info(
         .flags = .{},
         .stage = stage,
         .module = shaderModule,
-        .p_name = entry orelse &"main",
+        .p_name = if (entry) |e| e else "main",
         .p_specialization_info = null,
     };
 }
