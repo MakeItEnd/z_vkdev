@@ -5,6 +5,7 @@ pub const Renderer = struct {
 
     allocator: std.mem.Allocator,
     vk_ctx: *VK_CTX,
+    im_ctx: IM_CTX,
     swap_chain: SwapChain,
 
     extent: vk.Extent2D,
@@ -24,6 +25,10 @@ pub const Renderer = struct {
     triangle_pipeline_layout: vk.PipelineLayout,
     triangle_pipeline: vk.Pipeline,
 
+    mesh_pipeline_layout: vk.PipelineLayout,
+    mesh_pipeline: vk.Pipeline,
+    rectangle: GPUMeshBuffers,
+
     pub fn init(
         allocator: std.mem.Allocator,
         window: sdl.video.Window,
@@ -38,6 +43,10 @@ pub const Renderer = struct {
         self.vk_ctx.* = try VK_CTX.init(self.allocator, window);
         errdefer self.vk_ctx.deinit();
         std.log.debug("[Engine][Vulkan][Context] Initialized successfully!", .{});
+
+        self.im_ctx = try IM_CTX.init(self.vk_ctx);
+        errdefer self.im_ctx.deinit(self.vk_ctx);
+        std.log.debug("[Engine][Vulkan][Immediate Mode Context] Initialized successfully!", .{});
 
         self.swap_chain = try SwapChain.init(self.vk_ctx, extent);
         errdefer self.swap_chain.deinit();
@@ -61,6 +70,8 @@ pub const Renderer = struct {
         };
         self.frame_number = 0;
 
+        try self.init_default_data();
+
         return self;
     }
 
@@ -71,8 +82,12 @@ pub const Renderer = struct {
             frame.deinit(self.vk_ctx);
         }
 
+        self.rectangle.deinit(self.vk_ctx);
+
         self.vk_ctx.device.destroyPipelineLayout(self.triangle_pipeline_layout, null);
         self.vk_ctx.device.destroyPipeline(self.triangle_pipeline, null);
+        self.vk_ctx.device.destroyPipelineLayout(self.mesh_pipeline_layout, null);
+        self.vk_ctx.device.destroyPipeline(self.mesh_pipeline, null);
 
         for (self.compute_effects.items) |compute_effect| {
             compute_effect.deinit(self.vk_ctx);
@@ -90,6 +105,9 @@ pub const Renderer = struct {
 
         self.swap_chain.deinit();
         std.log.debug("[Engine][Vulkan][Swap Chain] Deinitialized successfully!", .{});
+
+        self.im_ctx.deinit(self.vk_ctx);
+        std.log.debug("[Engine][Vulkan][Immediate Mode Context] Deinitialized successfully!", .{});
 
         self.vk_ctx.deinit();
         self.allocator.destroy(self.vk_ctx);
@@ -261,6 +279,143 @@ pub const Renderer = struct {
 
         // Increase the number of frames drawn.
         self.frame_number += 1;
+    }
+
+    pub fn upload_mesh(
+        self: *Renderer,
+        indicies: []const u32,
+        vertices: []const Vertex,
+    ) !GPUMeshBuffers {
+        const vertex_buffer_size: usize = vertices.len * @sizeOf(Vertex);
+        const index_buffer_size: usize = indicies.len * @sizeOf(u32);
+
+        var new_surface: GPUMeshBuffers = undefined;
+
+        // Create vertex buffer.
+        new_surface.vertex_buffer = try AllocatedBuffer.init(
+            self.vk_ctx,
+            vertex_buffer_size,
+            .{
+                .storage_buffer_bit = true,
+                .transfer_dst_bit = true,
+                .shader_device_address_bit = true,
+            },
+            .gpu_only,
+        );
+
+        // Find the address of the vertex buffer.
+        new_surface.vertex_buffer_address = self.vk_ctx.device.getBufferDeviceAddress(&.{
+            .buffer = new_surface.vertex_buffer.handle,
+        });
+
+        // Create index buffer.
+        new_surface.index_buffer = try AllocatedBuffer.init(
+            self.vk_ctx,
+            index_buffer_size,
+            .{
+                .index_buffer_bit = true,
+                .transfer_dst_bit = true,
+            },
+            .gpu_only,
+        );
+
+        // Use a staging buffer to write data to the buffers.
+        const staging: AllocatedBuffer = try AllocatedBuffer.init(
+            self.vk_ctx,
+            vertex_buffer_size + index_buffer_size,
+            .{
+                .transfer_src_bit = true,
+            },
+            .cpu_only,
+        );
+        defer staging.deinit(self.vk_ctx);
+
+        // void* mappedData;
+        // vmaMapMemory(allocator->handle, _allocation, &mappedData);
+        // memcpy(mappedData, data.data(), bufferSize);
+        var data: ?*anyopaque = undefined;
+        try self.vk_ctx.vma.memoryMap(staging.allocation, @ptrCast(&data));
+        defer self.vk_ctx.vma.memoryUnmap(staging.allocation);
+        const aligned_data: [*]Vertex = @ptrCast(@alignCast(data));
+        // Copy vertex buffer.
+        @memcpy(aligned_data, vertices);
+        // c.vma.UnmapMemory(self.vma_allocator, staging_buffer.allocation);
+        // Copy index buffer.
+        const aligned_data2: [*]u32 = @ptrCast(@alignCast(@as([*]u8, @ptrCast(@alignCast(data))) + vertex_buffer_size));
+        @memcpy(aligned_data2, indicies);
+        // memcpy(data, vertices.data(), vertexBufferSize);
+        // memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
+
+        { // Immediate submit.
+            const cmd = try self.im_ctx.submit_begin(self.vk_ctx);
+
+            const vertex_copy: vk.BufferCopy = .{
+                .src_offset = 0,
+                .dst_offset = 0,
+                .size = vertex_buffer_size,
+            };
+            self.vk_ctx.device.cmdCopyBuffer(
+                cmd,
+                staging.handle,
+                new_surface.vertex_buffer.handle,
+                1,
+                @ptrCast(&vertex_copy),
+            );
+
+            const index_copy: vk.BufferCopy = .{
+                .src_offset = vertex_buffer_size,
+                .dst_offset = 0,
+                .size = index_buffer_size,
+            };
+            self.vk_ctx.device.cmdCopyBuffer(
+                cmd,
+                staging.handle,
+                new_surface.index_buffer.handle,
+                1,
+                @ptrCast(&index_copy),
+            );
+
+            try self.im_ctx.submit_end(self.vk_ctx, cmd);
+        }
+
+        return new_surface;
+    }
+
+    fn init_default_data(self: *Renderer) !void {
+        const rect_vertices: [4]Vertex = .{
+            .{
+                .position = .{ 0.5, -0.5, 0.0 },
+                .uv_x = 0.0,
+                .normal = .{ 0.0, 0.0, 0.0 },
+                .uv_y = 0.0,
+                .color = .{ 0.0, 0.0, 0.0, 1.0 },
+            },
+            .{
+                .position = .{ 0.5, 0.5, 0.0 },
+                .uv_x = 0.0,
+                .normal = .{ 0.0, 0.0, 0.0 },
+                .uv_y = 0.0,
+                .color = .{ 0.5, 0.5, 0.5, 1.0 },
+            },
+            .{
+                .position = .{ -0.5, -0.5, 0.0 },
+                .uv_x = 0.0,
+                .normal = .{ 0.0, 0.0, 0.0 },
+                .uv_y = 0.0,
+                .color = .{ 1.0, 0.0, 0.0, 1.0 },
+            },
+            .{
+                .position = .{ -0.5, 0.5, 0.0 },
+                .uv_x = 0.0,
+                .normal = .{ 0.0, 0.0, 0.0 },
+                .uv_y = 0.0,
+                .color = .{ 0.0, 1.0, 0.0, 1.0 },
+            },
+        };
+
+        const rect_indices: [6]u32 = .{ 0, 1, 2, 2, 1, 3 };
+
+        self.rectangle = try self.upload_mesh(&rect_indices, &rect_vertices);
     }
 
     fn draw_background(self: *Renderer, cmd: vk.CommandBuffer) void {
@@ -519,6 +674,7 @@ pub const Renderer = struct {
         ));
 
         try self.init_triangle_pipeline();
+        try self.init_mesh_pipeline();
     }
 
     fn init_triangle_pipeline(self: *Renderer) !void {
@@ -569,6 +725,69 @@ pub const Renderer = struct {
 
         // Finally build the pipeline.
         self.triangle_pipeline = pipeline_builder.build();
+
+        // Clean structures.
+        self.vk_ctx.device.destroyShaderModule(triangle_fragment_shader, null);
+        self.vk_ctx.device.destroyShaderModule(triangle_vertex_shader, null);
+    }
+
+    fn init_mesh_pipeline(self: *Renderer) !void {
+        const triangle_fragment_shader: vk.ShaderModule = try shaders.load_module(
+            self.vk_ctx,
+            "./shaders/colored_triangle.frag.spv",
+        );
+        std.log.debug("[Renderer][Pipeline]<Rectangle> Fragment shader succesfully loaded.", .{});
+
+        const triangle_vertex_shader: vk.ShaderModule = try shaders.load_module(
+            self.vk_ctx,
+            "./shaders/colored_triangle_mesh.vert.spv",
+        );
+        std.log.debug("[Renderer][Pipeline]<Rectangle> Vertex shader succesfully loaded.", .{});
+
+        const buffer_range: vk.PushConstantRange = .{
+            .stage_flags = .{ .vertex_bit = true },
+            .offset = 0,
+            .size = @sizeOf(GPUDrawPushConstants),
+        };
+
+        // Build the pipeline layout that controls the inputs/outputs of the shader.
+        // We are not using descriptor sets or other systems yet,
+        // so no need to use anything other thantriangle_fragment_shader empty default.
+        const pipeline_layout_info: vk.PipelineLayoutCreateInfo = .{
+            .push_constant_range_count = 1,
+            .p_push_constant_ranges = @ptrCast(&buffer_range),
+        };
+        self.mesh_pipeline_layout = try self.vk_ctx.device.createPipelineLayout(
+            &pipeline_layout_info,
+            null,
+        );
+
+        var pipeline_builder: vkb.PieplineBuilder = try vkb.PieplineBuilder.init(self.vk_ctx);
+        defer pipeline_builder.deinit();
+
+        // Use the triangle layout we created.
+        pipeline_builder.pipeline_layout = self.mesh_pipeline_layout;
+        // Connecting the vertex and pixel shaders to the pipeline.
+        pipeline_builder.set_shaders(triangle_vertex_shader, triangle_fragment_shader);
+        // It will draw triangles.
+        pipeline_builder.set_input_topology(.triangle_list);
+        // Filled triangles.
+        pipeline_builder.set_polygon_mode(.fill);
+        // No backface culling.
+        pipeline_builder.set_cull_mode(.{}, .clockwise);
+        // No multisampling.draw_geometry()
+        pipeline_builder.set_multisampling_none();
+        // No blending.
+        pipeline_builder.disable_blending();
+        // No depth testing.
+        pipeline_builder.disable_depthtest();
+
+        // Connect the image format we will draw into, from draw image.
+        pipeline_builder.set_color_attachment_format(self.draw_image.format);
+        pipeline_builder.set_depth_format(.undefined);
+
+        // Finally build the pipeline.
+        self.mesh_pipeline = pipeline_builder.build();
 
         // Clean structures.
         self.vk_ctx.device.destroyShaderModule(triangle_fragment_shader, null);
@@ -643,6 +862,53 @@ pub const Renderer = struct {
             0,
         );
 
+        // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _meshPipeline);
+        self.vk_ctx.device.cmdBindPipeline(
+            cmd,
+            .graphics,
+            self.mesh_pipeline,
+        );
+
+        // GPUDrawPushConstants push_constants;
+        // push_constants.worldMatrix = glm::mat4{ 1.f };
+        // push_constants.vertexBuffer = rectangle.vertexBufferAddress;
+        const push_constants: GPUDrawPushConstants = .{
+            .world_matrix = .{
+                .{ 1.0, 0.0, 0.0, 0.0 },
+                .{ 0.0, 1.0, 0.0, 0.0 },
+                .{ 0.0, 0.0, 1.0, 0.0 },
+                .{ 0.0, 0.0, 0.0, 1.0 },
+            },
+            .vertex_buffer = self.rectangle.vertex_buffer_address,
+        };
+
+        // vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &push_constants);
+        self.vk_ctx.device.cmdPushConstants(
+            cmd,
+            self.mesh_pipeline_layout,
+            .{ .vertex_bit = true },
+            0,
+            @sizeOf(GPUDrawPushConstants),
+            &push_constants,
+        );
+        // vkCmdBindIndexBuffer(cmd, rectangle.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+        self.vk_ctx.device.cmdBindIndexBuffer(
+            cmd,
+            self.rectangle.index_buffer.handle,
+            0,
+            .uint32,
+        );
+
+        // vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+        self.vk_ctx.device.cmdDrawIndexed(
+            cmd,
+            6,
+            1,
+            0,
+            0,
+            0,
+        );
+
         self.vk_ctx.device.cmdEndRendering(cmd);
     }
 };
@@ -651,8 +917,10 @@ const std = @import("std");
 
 const sdl = @import("sdl3");
 const vk = @import("vulkan");
+const zm = @import("zm");
 
 const AllocatedImage = @import("./allocated_image.zig").AllocatedImage;
+const AllocatedBuffer = @import("./allocated_buffer.zig").AllocatedBuffer;
 const DescriptorAllocator = @import("./descriptors.zig").DescriptorAllocator;
 const DescriptorLayoutBuilder = @import("./descriptors.zig").DescriptorLayoutBuilder;
 const FrameData = @import("./frame_data.zig").FrameData;
@@ -663,3 +931,7 @@ const vkb = @import("./vk_bootstrap.zig");
 const shaders = @import("./shaders.zig");
 const ComputePushConstants = @import("./push_constants.zig").ComputePushConstants;
 const ComputeEffect = @import("./compute_effect.zig").ComputeEffect;
+const Vertex = @import("vk_types.zig").Vertex;
+const GPUMeshBuffers = @import("vk_types.zig").GPUMeshBuffers;
+const GPUDrawPushConstants = @import("vk_types.zig").GPUDrawPushConstants;
+const IM_CTX = @import("./vk_ctx_im.zig").IM_CTX;

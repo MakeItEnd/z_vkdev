@@ -28,7 +28,7 @@
 
     // Tracks the earliest Zig version that the package considers to be a
     // supported use case.
-    .minimum_zig_version = "0.14.1",
+    .minimum_zig_version = "0.15.1",
 
     // This field is optional.
     // Each dependency must either provide a `url` and `hash`, or a `path`.
@@ -51,6 +51,10 @@
         .vulkan_headers = .{
             .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.4.323.tar.gz",
             .hash = "N-V-__8AAKDR9QE0UDIcMBqpmUjBm5ayQHNNVb8JuOCy4GOo",
+        },
+        .zm = .{
+            .url = "git+https://github.com/griush/zm#b5d70485dfc78baa9251a06a844d860fd00e9bcf",
+            .hash = "zm-0.4.0-cLX-WdndAACqPRGqhCAsd65iTajgaVVwrXhoLUQFKTOt",
         },
     },
     .paths = .{

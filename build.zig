@@ -59,6 +59,14 @@ pub fn build(b: *std.Build) !void {
 
     lib.root_module.addImport("zig_vma", zig_vma);
 
+    // Zig math library --------------------------------------------------------
+    // -------------------------------------------------------------------------
+    const zm = b.dependency("zm", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    lib.root_module.addImport("zm", zm.module("zm"));
+
     b.installArtifact(lib);
 
     const exe = b.addExecutable(.{

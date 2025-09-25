@@ -46,7 +46,9 @@ pub const InstanceBuilder = struct {
         defer extension_names.deinit(self.allocator);
         // these extensions are to support vulkan in mac os
         // see https://github.com/glfw/glfw/issues/2335
-        try extension_names.append(self.allocator, vk.extensions.khr_portability_enumeration.name);
+        if (@import("builtin").os.tag == .macos) {
+            try extension_names.append(self.allocator, vk.extensions.khr_portability_enumeration.name);
+        }
         try extension_names.append(self.allocator, vk.extensions.khr_get_physical_device_properties_2.name);
 
         if (self.enable_validation_layers) {
