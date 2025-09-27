@@ -1,6 +1,6 @@
 //! General usage types for vulkand data
 
-pub const Vertex = struct {
+pub const Vertex = extern struct {
     position: [3]f32,
     uv_x: f32,
     normal: [3]f32,
@@ -20,12 +20,11 @@ pub const GPUMeshBuffers = struct {
     }
 };
 
-pub const GPUDrawPushConstants = struct {
+pub const GPUDrawPushConstants = extern struct {
     world_matrix: [4]@Vector(4, f32),
     vertex_buffer: vk.DeviceAddress,
 };
 
 const vk = @import("vulkan");
-const zm = @import("zm");
 const AllocatedBuffer = @import("allocated_buffer.zig").AllocatedBuffer;
 const VK_CTX = @import("./vk_ctx.zig").VK_CTX;

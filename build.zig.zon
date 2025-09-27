@@ -52,9 +52,9 @@
             .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.4.323.tar.gz",
             .hash = "N-V-__8AAKDR9QE0UDIcMBqpmUjBm5ayQHNNVb8JuOCy4GOo",
         },
-        .zm = .{
-            .url = "git+https://github.com/griush/zm#b5d70485dfc78baa9251a06a844d860fd00e9bcf",
-            .hash = "zm-0.4.0-cLX-WdndAACqPRGqhCAsd65iTajgaVVwrXhoLUQFKTOt",
+        .zgltf = .{
+            .url = "git+https://github.com/kooparse/zgltf#fc3bb36672fb71f05e0226160051e7104b0c6865",
+            .hash = "zgltf-0.1.0-sX6QArASAgBCGBz2QR-lv48sEuXhENvQyi3y8weqJzwZ",
         },
     },
     .paths = .{
