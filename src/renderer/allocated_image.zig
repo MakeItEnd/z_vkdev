@@ -5,11 +5,19 @@ pub const AllocatedImage = struct {
     extent: vk.Extent3D,
     format: vk.Format,
 
-    pub fn init(vk_ctx: *VK_CTX, window_extent: vk.Extent2D) !AllocatedImage {
+    pub fn init(
+        vk_ctx: *VK_CTX,
+        window_extent: vk.Extent2D,
+        format: vk.Format,
+        usageFlags: vk.ImageUsageFlags,
+        aspectFlags: vk.ImageAspectFlags,
+    ) !AllocatedImage {
         var self: AllocatedImage = undefined;
 
         // Hardcoding the draw format to 32 bit float.
-        self.format = vk.Format.r16g16b16a16_sfloat;
+        // self.format = vk.Format.r16g16b16a16_sfloat;
+        // self.format = vk.Format.d32_sfloat;
+        self.format = format;
         // Draw image size will match the window.
         self.extent = .{
             .width = window_extent.width,
@@ -19,12 +27,7 @@ pub const AllocatedImage = struct {
 
         const create_info = vk_init.image_create_info(
             self.format,
-            .{
-                .transfer_src_bit = true,
-                .transfer_dst_bit = true,
-                .storage_bit = true,
-                .color_attachment_bit = true,
-            },
+            usageFlags,
             self.extent,
         );
 
@@ -45,9 +48,7 @@ pub const AllocatedImage = struct {
         const view_create_info = vk_init.imageview_create_info(
             self.format,
             self.handle,
-            .{
-                .color_bit = true,
-            },
+            aspectFlags,
         );
 
         self.view = try vk_ctx.device.createImageView(

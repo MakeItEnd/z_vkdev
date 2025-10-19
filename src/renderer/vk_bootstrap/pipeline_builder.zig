@@ -43,8 +43,11 @@ pub const PieplineBuilder = struct {
         self.pipeline_layout = .null_handle;
         self.depth_stencil = std.mem.zeroes(vk.PipelineDepthStencilStateCreateInfo);
         self.depth_stencil.s_type = .pipeline_depth_stencil_state_create_info;
-        self.render_info = std.mem.zeroes(vk.PipelineRenderingCreateInfo);
-        self.render_info.s_type = .pipeline_rendering_create_info;
+        self.render_info = vk.PipelineRenderingCreateInfo{
+            .view_mask = 0,
+            .depth_attachment_format = .undefined,
+            .stencil_attachment_format = .undefined,
+        };
 
         self.shader_stages.clearRetainingCapacity();
     }
@@ -213,6 +216,22 @@ pub const PieplineBuilder = struct {
         self.depth_stencil.depth_test_enable = vk.FALSE;
         self.depth_stencil.depth_write_enable = vk.FALSE;
         self.depth_stencil.depth_compare_op = .never;
+        self.depth_stencil.depth_bounds_test_enable = vk.FALSE;
+        self.depth_stencil.stencil_test_enable = vk.FALSE;
+        self.depth_stencil.front = std.mem.zeroes(vk.StencilOpState);
+        self.depth_stencil.back = std.mem.zeroes(vk.StencilOpState);
+        self.depth_stencil.min_depth_bounds = 0.0;
+        self.depth_stencil.max_depth_bounds = 1.0;
+    }
+
+    pub fn enable_depthtest(
+        self: *PieplineBuilder,
+        depth_write_enable: bool,
+        depth_compare_op: vk.CompareOp,
+    ) void {
+        self.depth_stencil.depth_test_enable = vk.TRUE;
+        self.depth_stencil.depth_write_enable = if (depth_write_enable) vk.TRUE else vk.FALSE;
+        self.depth_stencil.depth_compare_op = depth_compare_op;
         self.depth_stencil.depth_bounds_test_enable = vk.FALSE;
         self.depth_stencil.stencil_test_enable = vk.FALSE;
         self.depth_stencil.front = std.mem.zeroes(vk.StencilOpState);

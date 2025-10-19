@@ -97,8 +97,8 @@ pub fn depth_attachment_info(
     return .{
         .image_view = view,
         .image_layout = layout,
-        .resolve_mode = .null_handle,
-        .resolve_image_layout = .null_handle,
+        .resolve_mode = .{},
+        .resolve_image_layout = .undefined,
         .load_op = .clear,
         .store_op = .store,
         .clear_value = .{

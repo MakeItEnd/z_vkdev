@@ -19,6 +19,7 @@ pub fn transition(
         },
         .dst_stage_mask = .{
             .all_commands_bit = true,
+            .host_bit = true,
         },
         .dst_access_mask = .{
             .host_write_bit = true,

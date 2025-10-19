@@ -11,6 +11,7 @@ pub const Renderer = struct {
     extent: vk.Extent2D,
 
     draw_image: AllocatedImage,
+    depth_image: AllocatedImage,
 
     frames: [FRAME_OVERLAP]FrameData,
     frame_number: usize = 0,
@@ -28,6 +29,8 @@ pub const Renderer = struct {
     mesh_pipeline_layout: vk.PipelineLayout,
     mesh_pipeline: vk.Pipeline,
     rectangle: GPUMeshBuffers,
+
+    test_meshes: std.array_list.Aligned(MeshAsset, null),
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -52,9 +55,36 @@ pub const Renderer = struct {
         errdefer self.swap_chain.deinit();
         std.log.debug("[Engine][Vulkan][Swap Chain] Initialized successfully!", .{});
 
-        self.draw_image = try AllocatedImage.init(self.vk_ctx, extent);
+        self.draw_image = try AllocatedImage.init(
+            self.vk_ctx,
+            extent,
+            vk.Format.r16g16b16a16_sfloat,
+            .{
+                .transfer_src_bit = true,
+                .transfer_dst_bit = true,
+                .storage_bit = true,
+                .color_attachment_bit = true,
+            },
+            .{
+                .color_bit = true,
+            },
+        );
         errdefer self.draw_image.deinit(self.vk_ctx);
         std.log.debug("[Engine][Vulkan][Draw Image] Initialized successfully!", .{});
+
+        self.depth_image = try AllocatedImage.init(
+            self.vk_ctx,
+            extent,
+            vk.Format.d32_sfloat,
+            .{
+                .depth_stencil_attachment_bit = true,
+            },
+            .{
+                .depth_bit = true,
+            },
+        );
+        errdefer self.depth_image.deinit(self.vk_ctx);
+        std.log.debug("[Engine][Vulkan][Depth Image] Initialized successfully!", .{});
 
         try self.init_descriptors();
         std.log.debug("[Engine][Vulkan][Descriptors] Initialized successfully!", .{});
@@ -72,6 +102,10 @@ pub const Renderer = struct {
 
         try self.init_default_data();
 
+        if (try load_gltf_meshes(&self, "assets/basicmesh.glb")) |t_meshes| {
+            self.test_meshes = t_meshes;
+        }
+
         return self;
     }
 
@@ -81,6 +115,11 @@ pub const Renderer = struct {
         for (self.frames) |frame| {
             frame.deinit(self.vk_ctx);
         }
+
+        for (self.test_meshes.items) |*mesh| {
+            mesh.deinit(self);
+        }
+        self.test_meshes.deinit(self.allocator);
 
         self.rectangle.deinit(self.vk_ctx);
 
@@ -102,6 +141,9 @@ pub const Renderer = struct {
 
         self.draw_image.deinit(self.vk_ctx);
         std.log.debug("[Engine][Vulkan][Draw Image] Deinitialized successfully!", .{});
+
+        self.depth_image.deinit(self.vk_ctx);
+        std.log.debug("[Engine][Vulkan][Depth Image] Deinitialized successfully!", .{});
 
         self.swap_chain.deinit();
         std.log.debug("[Engine][Vulkan][Swap Chain] Deinitialized successfully!", .{});
@@ -178,6 +220,12 @@ pub const Renderer = struct {
             cmd,
             .general,
             .color_attachment_optimal,
+        );
+        self.depth_image.transition(
+            self.vk_ctx,
+            cmd,
+            .undefined,
+            .depth_attachment_optimal,
         );
 
         self.draw_geometry(cmd);
@@ -716,12 +764,18 @@ pub const Renderer = struct {
         pipeline_builder.set_multisampling_none();
         // No blending.
         pipeline_builder.disable_blending();
-        // No depth testing.
-        pipeline_builder.disable_depthtest();
+        // // No depth testing.
+        // pipeline_builder.disable_depthtest();
+        // Enable depth testing.
+        pipeline_builder.enable_depthtest(
+            true,
+            .greater_or_equal,
+        );
 
         // Connect the image format we will draw into, from draw image.
         pipeline_builder.set_color_attachment_format(self.draw_image.format);
-        pipeline_builder.set_depth_format(.undefined);
+        // pipeline_builder.set_depth_format(.undefined);
+        pipeline_builder.set_depth_format(self.depth_image.format);
 
         // Finally build the pipeline.
         self.triangle_pipeline = pipeline_builder.build();
@@ -779,12 +833,18 @@ pub const Renderer = struct {
         pipeline_builder.set_multisampling_none();
         // No blending.
         pipeline_builder.disable_blending();
-        // No depth testing.
-        pipeline_builder.disable_depthtest();
+        // // No depth testing.
+        // pipeline_builder.disable_depthtest();
+        // Enable depth testing.
+        pipeline_builder.enable_depthtest(
+            true,
+            .greater_or_equal,
+        );
 
         // Connect the image format we will draw into, from draw image.
         pipeline_builder.set_color_attachment_format(self.draw_image.format);
-        pipeline_builder.set_depth_format(.undefined);
+        // pipeline_builder.set_depth_format(.undefined);
+        pipeline_builder.set_depth_format(self.depth_image.format);
 
         // Finally build the pipeline.
         self.mesh_pipeline = pipeline_builder.build();
@@ -801,11 +861,15 @@ pub const Renderer = struct {
             null,
             .color_attachment_optimal,
         );
+        var depth_attachment: vk.RenderingAttachmentInfo = vk_init.depth_attachment_info(
+            self.depth_image.view,
+            .depth_attachment_optimal,
+        );
 
         const render_info: vk.RenderingInfo = vk_init.rendering_info(
             self.extent,
             &color_attachment,
-            null,
+            &depth_attachment,
         );
         self.vk_ctx.device.cmdBeginRendering(
             cmd,
@@ -909,6 +973,70 @@ pub const Renderer = struct {
             0,
         );
 
+        // Draw test meshes (susan)
+        var susan_push_constants: GPUDrawPushConstants = .{
+            .world_matrix = .{
+                .{ 1.0, 0.0, 0.0, 0.0 },
+                .{ 0.0, 1.0, 0.0, 0.0 },
+                .{ 0.0, 0.0, 1.0, 0.0 },
+                .{ 0.0, 0.0, 0.0, 1.0 },
+            },
+            .vertex_buffer = self.test_meshes.items[2].buffers.vertex_buffer_address,
+        };
+
+        // PERSP -----
+        const view =
+            zm.Mat4f.translationVec3(zm.Vec3f{ 0.0, 0.0, -0.5 });
+        var projection = zm.Mat4f.perspective(
+            70.0 * (@as(f32, std.math.pi) / 180),
+            @as(f32, @floatFromInt(self.extent.width)) / @as(f32, @floatFromInt(self.extent.height)),
+            10_000.0,
+            0.1,
+        );
+        // Invert the Y direction on projection matrix so that we are more
+        // similar to opengl and gltf axis.
+        // projection[1][1] *= -1;
+        projection.data[1 * 4 + 1] *= -1.0;
+        // projection[1][1] *= -1.0;
+        const nwm = projection.multiply(view).data;
+        susan_push_constants.world_matrix = .{
+            .{ nwm[0], nwm[1], nwm[2], nwm[3] },
+            .{ nwm[4], nwm[5], nwm[6], nwm[7] },
+            .{ nwm[8], nwm[9], nwm[10], nwm[11] },
+            .{ nwm[12], nwm[13], nwm[14], nwm[15] },
+        };
+        // susan_push_constants.world_matrix = .{
+        //     .{ 1.0, 0.0, 0.0, 0.0 },
+        //     .{ 0.0, 1.0, 0.0, 0.0 },
+        //     .{ 0.0, 0.0, 1.0, 0.0 },
+        //     .{ 0.0, 0.0, 0.0, 1.0 },
+        // };
+        // PERSP -----
+
+        self.vk_ctx.device.cmdPushConstants(
+            cmd,
+            self.mesh_pipeline_layout,
+            .{ .vertex_bit = true },
+            0,
+            @sizeOf(GPUDrawPushConstants),
+            &susan_push_constants,
+        );
+        self.vk_ctx.device.cmdBindIndexBuffer(
+            cmd,
+            self.test_meshes.items[2].buffers.index_buffer.handle,
+            0,
+            .uint32,
+        );
+
+        self.vk_ctx.device.cmdDrawIndexed(
+            cmd,
+            self.test_meshes.items[2].surface.items[0].count,
+            1,
+            self.test_meshes.items[2].surface.items[0].start_index,
+            0,
+            0,
+        );
+
         self.vk_ctx.device.cmdEndRendering(cmd);
     }
 };
@@ -935,3 +1063,5 @@ const Vertex = @import("vk_types.zig").Vertex;
 const GPUMeshBuffers = @import("vk_types.zig").GPUMeshBuffers;
 const GPUDrawPushConstants = @import("vk_types.zig").GPUDrawPushConstants;
 const IM_CTX = @import("./vk_ctx_im.zig").IM_CTX;
+const load_gltf_meshes = @import("./vk_loader.zig").load_gltf_meshes;
+const MeshAsset = @import("./vk_loader.zig").MeshAsset;

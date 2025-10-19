@@ -72,6 +72,10 @@ pub const InstanceBuilder = struct {
             return error.requiredInstanceLayerPropertyNotAvailable;
         }
 
+        const create_info_flags: vk.InstanceCreateFlags = if (@import("builtin").os.tag == .macos) .{
+            .enumerate_portability_bit_khr = true,
+        } else .{};
+
         var create_info: vk.InstanceCreateInfo = .{
             .p_application_info = &.{
                 .p_application_name = self.application_name,
@@ -84,7 +88,7 @@ pub const InstanceBuilder = struct {
             .pp_enabled_extension_names = extension_names.items.ptr,
             // enumerate_portability_bit_khr to support vulkan in mac os
             // see https://github.com/glfw/glfw/issues/2335
-            .flags = .{ .enumerate_portability_bit_khr = true },
+            .flags = create_info_flags,
         };
         var debug_create_info: vk.DebugUtilsMessengerCreateInfoEXT = undefined;
 

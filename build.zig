@@ -59,10 +59,18 @@ pub fn build(b: *std.Build) !void {
 
     lib.root_module.addImport("zig_vma", zig_vma);
 
-    // Zig math library --------------------------------------------------------
+    // Zig GLTF library --------------------------------------------------------
     // -------------------------------------------------------------------------
     const zgltf = b.dependency("zgltf", .{});
     lib.root_module.addImport("zgltf", zgltf.module("zgltf"));
+
+    // Zig math library --------------------------------------------------------
+    // -------------------------------------------------------------------------
+    const zm = b.dependency("zm", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    lib.root_module.addImport("zm", zm.module("zm"));
 
     b.installArtifact(lib);
 
